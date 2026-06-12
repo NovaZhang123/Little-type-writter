@@ -1,0 +1,3712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Little 3D Typewriter</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --panel: rgba(45, 31, 26, 0.72);
+      --ink: #fff7e8;
+      --muted: rgba(255, 247, 232, 0.72);
+      --line: rgba(255, 247, 232, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 28% 12%, #ffe0bb 0%, transparent 26%),
+        radial-gradient(circle at 75% 20%, #c4d7ff 0%, transparent 22%),
+        linear-gradient(135deg, #30231e 0%, #4a3028 46%, #17212d 100%);
+      font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", system-ui, sans-serif;
+      color: var(--ink);
+      touch-action: none;
+    }
+
+    #app {
+      position: fixed;
+      inset: 0;
+    }
+
+    #loadingOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 35% 22%, rgba(255,224,187,0.24), transparent 32%),
+        linear-gradient(135deg, #30231e 0%, #4a3028 46%, #17212d 100%);
+      color: var(--ink);
+      transition: opacity 360ms ease, visibility 360ms ease;
+    }
+
+    #loadingOverlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .loading-card {
+      width: min(380px, calc(100vw - 32px));
+      padding: 18px 20px;
+      border-radius: 24px;
+      background: rgba(45,31,26,0.74);
+      border: 1px solid rgba(255,247,232,0.16);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.34);
+      text-align: center;
+      backdrop-filter: blur(16px);
+    }
+
+    .loading-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 19px;
+      letter-spacing: -0.03em;
+    }
+
+    .loading-card span {
+      display: block;
+      color: rgba(255,247,232,0.68);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .loading-dots {
+      margin: 12px auto 0;
+      width: 54px;
+      height: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .loading-dots i {
+      display: block;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,235,184,0.78);
+      animation: loadingDot 900ms ease-in-out infinite;
+    }
+
+    .loading-dots i:nth-child(2) { animation-delay: 120ms; }
+    .loading-dots i:nth-child(3) { animation-delay: 240ms; }
+
+    @keyframes loadingDot {
+      0%, 100% { transform: translateY(0); opacity: 0.45; }
+      50% { transform: translateY(-5px); opacity: 1; }
+    }
+
+    #soundUnlockToast {
+      position: fixed;
+      left: 50%;
+      bottom: 76px;
+      transform: translateX(-50%);
+      z-index: 6;
+      max-width: calc(100vw - 28px);
+      padding: 10px 13px;
+      border-radius: 999px;
+      background: rgba(35,24,21,0.78);
+      border: 1px solid rgba(255,247,232,0.18);
+      color: rgba(255,247,232,0.86);
+      box-shadow: 0 14px 36px rgba(0,0,0,0.25);
+      font-size: 12px;
+      font-weight: 800;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 220ms ease, transform 220ms ease;
+    }
+
+    #soundUnlockToast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    #ui {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .card {
+      max-width: 360px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: clamp(14px, 1.8vw, 19px);
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+    }
+
+    p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.32;
+      color: var(--muted);
+    }
+
+    #controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+      pointer-events: auto;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.12);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 10px 13px;
+      font: 700 12px/1 ui-rounded, system-ui, sans-serif;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 8px 20px rgba(0,0,0,0.18);
+      transition: transform 140ms ease, background 140ms ease;
+    }
+
+    button:hover { background: rgba(255,255,255,0.18); }
+    button:active { transform: translateY(1px) scale(0.98); }
+
+    #viewBtn {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      z-index: 5;
+      pointer-events: auto;
+      padding: 13px 18px;
+      border-radius: 18px;
+      background: rgba(255, 247, 232, 0.18);
+      border: 1px solid rgba(255, 247, 232, 0.28);
+      font-size: 13px;
+      box-shadow: 0 14px 36px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.18);
+    }
+
+    #mobileKeys {
+      position: fixed;
+      left: 50%;
+      bottom: max(12px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      width: min(760px, calc(100vw - 18px));
+      padding: 9px;
+      border-radius: 20px;
+      background: rgba(30, 22, 20, 0.58);
+      border: 1px solid rgba(255,255,255,0.14);
+      backdrop-filter: blur(18px);
+      display: none;
+      z-index: 4;
+    }
+
+    .mobile-row {
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+      margin: 5px 0;
+    }
+
+    .mobile-key {
+      min-width: 28px;
+      flex: 0 1 36px;
+      height: 34px;
+      padding: 0;
+      border-radius: 11px;
+      font-size: 11px;
+    }
+
+    .mobile-key.wide { flex-basis: 72px; }
+    .mobile-key.space { flex-basis: 180px; }
+
+    #hint {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: calc(100vw - 24px);
+      text-align: center;
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: rgba(21, 15, 13, 0.48);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,247,232,0.78);
+      font-size: 12px;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+
+    #modalOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 8;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(14, 10, 9, 0.42);
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+    }
+
+    #modalOverlay.hidden,
+    .modal-panel.hidden {
+      display: none;
+    }
+
+    .modal-card {
+      width: min(520px, calc(100vw - 28px));
+      padding: 16px;
+      border-radius: 24px;
+      background: rgba(48, 34, 29, 0.9);
+      border: 1px solid rgba(255, 247, 232, 0.18);
+      box-shadow: 0 28px 80px rgba(0,0,0,0.38);
+      color: var(--ink);
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .modal-head h2 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: -0.02em;
+    }
+
+    .modal-close {
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      font-size: 21px;
+      line-height: 1;
+    }
+
+    .modal-copy {
+      margin: 0 0 12px;
+      color: rgba(255,247,232,0.74);
+      font-size: 13px;
+    }
+
+    #pasteInput {
+      width: 100%;
+      min-height: 180px;
+      resize: vertical;
+      border: 1px solid rgba(255,247,232,0.18);
+      border-radius: 18px;
+      padding: 14px;
+      background: rgba(255,247,232,0.11);
+      color: var(--ink);
+      font: 600 14px/1.45 ui-rounded, system-ui, sans-serif;
+      outline: none;
+    }
+
+    #pasteInput:focus {
+      border-color: rgba(255,247,232,0.38);
+      background: rgba(255,247,232,0.15);
+    }
+
+
+    .modal-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 12px;
+      color: rgba(255,247,232,0.82);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .modal-row label {
+      min-width: 48px;
+    }
+
+    #noteTypeSelect,
+    #pasteBookInput,
+    #saveBookInput {
+      flex: 1;
+      border: 1px solid rgba(255,247,232,0.18);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: rgba(255,247,232,0.11);
+      color: var(--ink);
+      font: 600 14px/1.2 ui-rounded, system-ui, sans-serif;
+      outline: none;
+    }
+
+    #noteTypeSelect:focus,
+    #pasteBookInput:focus,
+    #saveBookInput:focus {
+      border-color: rgba(255,247,232,0.38);
+      background: rgba(255,247,232,0.15);
+    }
+
+    #noteTypeSelect option {
+      color: #2b2526;
+      background: #fff3d6;
+    }
+
+    .archive-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .archive-nav span {
+      min-width: 88px;
+      text-align: center;
+      color: rgba(255,247,232,0.74);
+      font-size: 12px;
+      letter-spacing: 0.03em;
+    }
+
+    #savePreview {
+      display: block;
+      width: 100%;
+      max-height: 310px;
+      object-fit: contain;
+      border-radius: 16px;
+      border: 1px solid rgba(255,247,232,0.16);
+      background: #f8e7c5;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.16);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+
+    #noteDrawer {
+      position: fixed;
+      top: 108px;
+      right: 16px;
+      width: min(318px, calc(100vw - 24px));
+      max-height: calc(100vh - 132px);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: auto;
+      z-index: 3;
+      background:
+        linear-gradient(180deg, rgba(76, 53, 43, 0.92), rgba(46, 33, 28, 0.88));
+      border: 1px solid rgba(255, 232, 204, 0.22);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.07);
+    }
+
+    .drawer-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .drawer-head h3 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: #f4e4c7;
+    }
+
+    .drawer-head span {
+      font-size: 11px;
+      color: rgba(255,247,232,0.62);
+    }
+
+    .storage-note {
+      margin-top: -4px;
+      color: rgba(255,247,232,0.46);
+      font-size: 10px;
+      line-height: 1.2;
+    }
+
+    .drawer-toggle {
+      padding: 7px 9px;
+      font-size: 10px;
+      border-radius: 12px;
+      background: rgba(255,247,232,0.10);
+      color: rgba(255,247,232,0.82);
+    }
+
+    #noteDrawer.collapsed {
+      width: min(196px, calc(100vw - 24px));
+      max-height: 58px;
+      overflow: hidden;
+      cursor: default;
+    }
+
+    #noteDrawer.collapsed .drawer-head {
+      margin: -1px;
+    }
+
+    #noteDrawer.collapsed #bookShelf,
+    #noteDrawer.collapsed #noteList {
+      display: none !important;
+    }
+
+    #noteDrawer.collapsed .drawer-toggle {
+      background: rgba(255,247,232,0.18);
+    }
+
+    .book-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 8px 0 11px;
+    }
+
+    .book-chip {
+      border: 1px solid rgba(255,236,214,0.16);
+      background: rgba(255,247,232,0.09);
+      color: rgba(255,247,232,0.84);
+      border-radius: 999px;
+      padding: 7px 9px;
+      font: 800 10px/1 ui-rounded, system-ui, sans-serif;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .book-chip:hover {
+      background: rgba(255,247,232,0.20);
+      border-color: rgba(255,236,214,0.30);
+      color: #fff8ef;
+      transform: translateY(-1px);
+    }
+
+    .book-chip.active {
+      position: relative;
+      background:
+        radial-gradient(circle at 18% 24%, rgba(255,255,255,0.34), transparent 22%),
+        linear-gradient(135deg, rgba(255,231,169,0.38), rgba(255,247,232,0.18));
+      border-color: rgba(255,232,166,0.74);
+      color: #fffdf4;
+      box-shadow:
+        0 0 0 2px rgba(255,226,154,0.18),
+        0 0 18px rgba(255,216,134,0.22),
+        inset 0 1px 0 rgba(255,255,255,0.20);
+      transform: translateY(-1px) scale(1.03);
+    }
+
+    .book-chip.active::before {
+      content: "✓";
+      margin-right: 4px;
+      color: #fff0b5;
+      text-shadow: 0 0 8px rgba(255,232,166,0.72);
+    }
+
+    .book-chip.confirmed {
+      animation: chipConfirm 520ms ease both;
+    }
+
+    @keyframes chipConfirm {
+      0% {
+        transform: translateY(-1px) scale(1.03);
+        box-shadow: 0 0 0 0 rgba(255,235,176,0.0), 0 0 12px rgba(255,216,134,0.12);
+      }
+      45% {
+        transform: translateY(-2px) scale(1.11);
+        box-shadow: 0 0 0 7px rgba(255,235,176,0.17), 0 0 28px rgba(255,216,134,0.44);
+      }
+      100% {
+        transform: translateY(-1px) scale(1.03);
+        box-shadow: 0 0 0 2px rgba(255,226,154,0.18), 0 0 18px rgba(255,216,134,0.22);
+      }
+    }
+
+    .archive-info.book-moved {
+      animation: bookMovedInfo 740ms ease both;
+    }
+
+    @keyframes bookMovedInfo {
+      0% { color: rgba(255,247,232,0.68); }
+      28% { color: #fff0b5; text-shadow: 0 0 18px rgba(255,226,154,0.34); }
+      100% { color: rgba(255,247,232,0.68); }
+    }
+
+    .archive-move-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: center;
+      margin: -4px 0 10px;
+      color: rgba(255,247,232,0.62);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .archive-move-row .book-chip-row {
+      margin: 0;
+    }
+
+    #tuckPreview {
+      display: block;
+      width: 100%;
+      max-height: 310px;
+      object-fit: contain;
+      border-radius: 16px;
+      border: 1px solid rgba(255,247,232,0.16);
+      background: #f8e7c5;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.16);
+    }
+
+    .archive-move-row {
+      align-items: start;
+    }
+
+    .archive-move-row > span {
+      padding-top: 7px;
+    }
+
+    .archive-move-row .book-chip {
+      padding: 6px 8px;
+      font-size: 9px;
+    }
+
+
+    #bookShelf {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: -2px;
+    }
+
+    .book-pill {
+      border: 1px solid rgba(255,236,214,0.14);
+      border-radius: 999px;
+      background: rgba(255,247,232,0.08);
+      color: rgba(255,247,232,0.82);
+      font: 700 11px/1 ui-rounded, system-ui, sans-serif;
+      padding: 8px 10px;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .book-pill.active {
+      background: rgba(255,247,232,0.18);
+      border-color: rgba(255,236,214,0.28);
+      color: #fff5e8;
+    }
+
+    #bookShelf.shelf-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px;
+      margin-top: 0;
+    }
+
+    .book-cover {
+      position: relative;
+      min-height: 112px;
+      padding: 12px 11px 10px;
+      border-radius: 16px 19px 18px 14px;
+      border: 1px solid rgba(255,236,214,0.18);
+      background:
+        linear-gradient(135deg, rgba(255,247,232,0.18), rgba(255,247,232,0.05)),
+        linear-gradient(180deg, var(--book-a, rgba(126,91,72,0.72)), var(--book-b, rgba(68,47,43,0.88)));
+      box-shadow:
+        0 10px 24px rgba(0,0,0,0.22),
+        inset 6px 0 0 rgba(255,247,232,0.10),
+        inset -1px 0 0 rgba(0,0,0,0.16);
+      color: #fff6e9;
+      text-align: left;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .book-cover::after {
+      content: "";
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      bottom: 8px;
+      width: 4px;
+      border-radius: 999px;
+      background: rgba(255,247,232,0.18);
+      box-shadow: 6px 0 0 rgba(255,247,232,0.07), 12px 0 0 rgba(255,247,232,0.04);
+      opacity: 0.9;
+    }
+
+    .book-cover:hover {
+      transform: translateY(-1px);
+      background:
+        linear-gradient(135deg, rgba(255,247,232,0.24), rgba(255,247,232,0.08)),
+        linear-gradient(180deg, var(--book-a, rgba(126,91,72,0.76)), var(--book-b, rgba(68,47,43,0.92)));
+    }
+
+    .book-cover .book-sticker {
+      width: 31px;
+      height: 31px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 13px;
+      border-radius: 10px;
+      background: rgba(255,247,232,0.18);
+      border: 1px solid rgba(255,247,232,0.13);
+      font-size: 18px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+    }
+
+    .book-cover strong {
+      display: block;
+      max-width: 94%;
+      margin-bottom: 5px;
+      font-size: 12px;
+      line-height: 1.12;
+      letter-spacing: 0.02em;
+      color: #fff8ec;
+      text-transform: uppercase;
+    }
+
+    .book-cover small {
+      display: block;
+      font-size: 10px;
+      color: rgba(255,247,232,0.70);
+    }
+
+    .book-cover.empty-book {
+      opacity: 0.72;
+      border-style: dashed;
+    }
+
+    #bookShelf.book-view-nav {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 9px;
+      align-items: stretch;
+      margin-top: 0;
+    }
+
+    .book-back {
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: rgba(255,247,232,0.11);
+    }
+
+    .book-title-card {
+      min-width: 0;
+      padding: 10px 12px;
+      border-radius: 15px;
+      border: 1px solid rgba(255,236,214,0.14);
+      background: rgba(255,247,232,0.08);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .book-title-card strong {
+      display: block;
+      color: #fff4e3;
+      font-size: 13px;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .book-title-card small {
+      display: block;
+      margin-top: 3px;
+      color: rgba(255,247,232,0.62);
+      font-size: 10px;
+    }
+
+    .note-chip.in-book {
+      border-radius: 16px;
+      background:
+        linear-gradient(135deg, rgba(255,247,232,0.13), rgba(255,247,232,0.07));
+    }
+
+    #noteList {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .note-chip {
+      display: grid;
+      grid-template-columns: 54px 1fr;
+      gap: 10px;
+      align-items: center;
+      width: 100%;
+      padding: 8px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 236, 214, 0.12);
+      background: rgba(255, 247, 232, 0.08);
+      color: var(--ink);
+      cursor: pointer;
+      text-align: left;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .note-chip:hover {
+      background: rgba(255, 247, 232, 0.14);
+    }
+
+    .note-thumb {
+      width: 54px;
+      height: 54px;
+      border-radius: 8px;
+      border: 1px solid rgba(98, 72, 53, 0.25);
+      background: #f3e1bf;
+      object-fit: cover;
+    }
+
+    .note-meta strong {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: #fff4e3;
+    }
+
+    .note-meta small {
+      display: block;
+      font-size: 10px;
+      line-height: 1.35;
+      color: rgba(255,247,232,0.68);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .note-meta time {
+      display: block;
+      margin-top: 2px;
+      font-size: 9px;
+      color: rgba(255,247,232,0.48);
+      letter-spacing: 0.03em;
+    }
+
+    .archive-info {
+      margin: -4px 0 10px;
+      color: rgba(255,247,232,0.68);
+      font-size: 12px;
+    }
+
+    .drawer-empty {
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px dashed rgba(255,247,232,0.16);
+      color: rgba(255,247,232,0.58);
+      font-size: 12px;
+      line-height: 1.35;
+      text-align: center;
+    }
+
+    #archivePreview {
+      display: block;
+      width: 100%;
+      max-height: 64vh;
+      object-fit: contain;
+      border-radius: 16px;
+      border: 1px solid rgba(255,247,232,0.16);
+      background: #f8e7c5;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.16);
+    }
+
+    @media (max-width: 720px) {
+      #ui {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        gap: 8px;
+      }
+
+      .card {
+        padding: 11px 12px;
+        max-width: 58vw;
+      }
+
+      .card p { display: none; }
+
+      #controls button {
+        padding: 9px 10px;
+        font-size: 11px;
+      }
+
+      #viewBtn {
+        left: 10px;
+        bottom: calc(182px + env(safe-area-inset-bottom));
+        padding: 11px 13px;
+        font-size: 12px;
+      }
+
+      #noteDrawer {
+        top: auto;
+        bottom: calc(194px + env(safe-area-inset-bottom));
+        right: 10px;
+        left: 10px;
+        width: auto;
+        max-height: 220px;
+      }
+
+      #mobileKeys { display: block; }
+      #hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loadingOverlay" role="status" aria-live="polite">
+    <div class="loading-card">
+      <strong>Warming up the little machine…</strong>
+      <span>Loading the 3D typewriter and preparing the paper.</span>
+      <div class="loading-dots"><i></i><i></i><i></i></div>
+    </div>
+  </div>
+
+  <div id="soundUnlockToast">Sound unlocked ✓</div>
+
+  <div id="app"></div>
+
+  <div id="ui">
+    <div class="card">
+      <h1>Little 3D Typewriter</h1>
+      <p>Type on your keyboard, click the 3D keys, or use the tiny mobile keyboard. Enter returns the carriage. Backspace eats ink. Common punctuation has joined the party.</p>
+    </div>
+    <div id="controls">
+      <button id="viewBtn" type="button">View: Typing</button>
+      <button id="smallerBtn" type="button">Size −</button>
+      <button id="resetSizeBtn" type="button">100%</button>
+      <button id="resetViewBtn" type="button">Reset view</button>
+      <button id="biggerBtn" type="button">Size +</button>
+      <button id="pasteBtn" type="button">Paste & print</button>
+      <button id="saveBtn" type="button">Save note</button>
+      <button id="paperTypeBtn" type="button">Paper: Plain</button>
+      <button id="poetryBtn" type="button">Poetry line</button>
+      <button id="clearBtn" type="button">Clear page</button>
+      <button id="soundPresetBtn" type="button">Sound: Hard</button>
+      <button id="muteBtn" type="button">Sound on</button>
+    </div>
+  </div>
+
+
+  <aside id="noteDrawer" class="card collapsed" aria-label="saved notes drawer">
+    <div class="drawer-head">
+      <h3>Bookshelf</h3>
+      <span id="drawerCount">0 notes</span>
+      <button id="drawerToggleBtn" type="button" class="drawer-toggle">Open</button>
+    </div>
+    <div id="bookShelf" aria-label="book shelf filters"></div>
+    <div id="noteList">
+      <div class="drawer-empty">Typed notes will tuck themselves in here.</div>
+    </div>
+  </aside>
+
+  <div id="hint">Type, drag gently to inspect, or click the chunky little keys.</div>
+
+  <div id="mobileKeys" aria-label="mobile typewriter keys"></div>
+
+  <div id="modalOverlay" class="hidden" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <h2 id="modalTitle">Panel</h2>
+        <button id="modalCloseBtn" type="button" class="modal-close">×</button>
+      </div>
+
+      <div id="pastePanel" class="modal-panel hidden">
+        <p class="modal-copy">Paste a paragraph, or turn rough thoughts into a little usable page.</p>
+        <div class="modal-row">
+          <label for="noteTypeSelect">Format</label>
+          <select id="noteTypeSelect">
+            <option value="plain">Plain note</option>
+            <option value="bullets">Bullet note</option>
+            <option value="checklist">Checklist</option>
+            <option value="shopping">Shopping list</option>
+            <option value="plan">Plan</option>
+          </select>
+        </div>
+        <div class="modal-row">
+          <label for="pasteBookInput">Book</label>
+          <input id="pasteBookInput" type="text" placeholder="Inbox" value="Inbox" />
+        </div>
+        <textarea id="pasteInput" placeholder="Paste text here..."></textarea>
+        <div class="modal-actions">
+          <button id="pasteAppendBtn" type="button">Append & print</button>
+          <button id="pasteNewBtn" type="button">New page & print</button>
+        </div>
+      </div>
+
+
+      <div id="tuckPanel" class="modal-panel hidden">
+        <p class="modal-copy">This page is full. Choose a notebook before the slip tucks itself away.</p>
+        <div id="tuckBookChips" class="book-chip-row"></div>
+        <canvas id="tuckPreview" width="360" height="254"></canvas>
+        <div class="modal-actions">
+          <button id="tuckConfirmBtn" type="button">Tuck slip</button>
+          <button id="tuckDiscardBtn" type="button">Leave unsaved</button>
+        </div>
+      </div>
+
+
+      <div id="archivePanel" class="modal-panel hidden">
+        <p class="modal-copy">A saved little paper slip. You can return it to the machine or delete it.</p>
+        <div id="archiveInfo" class="archive-info"></div>
+        <div id="archiveMoveRow" class="archive-move-row">
+          <span>Move to</span>
+          <div id="archiveMoveChips" class="book-chip-row"></div>
+        </div>
+        <canvas id="archivePreview" width="1024" height="720"></canvas>
+        <div class="archive-nav">
+          <button id="archivePrevBtn" type="button">←</button>
+          <span id="archivePageLabel">Page 1 / 1</span>
+          <button id="archiveNextBtn" type="button">→</button>
+        </div>
+        <div class="modal-actions">
+          <button id="archivePutBackBtn" type="button">Put it back</button>
+          <button id="archiveDeleteBtn" type="button">Delete</button>
+          <button id="archiveSavePngBtn" type="button">Save PNG</button>
+        </div>
+      </div>
+
+
+      <div id="savePanel" class="modal-panel hidden">
+        <p class="modal-copy">Save the current paper as a little note.</p>
+        <div class="modal-row">
+          <label for="saveBookInput">Book</label>
+          <input id="saveBookInput" type="text" placeholder="Inbox" value="Inbox" />
+        </div>
+        <div id="saveBookChips" class="book-chip-row"></div>
+        <canvas id="savePreview" width="360" height="254"></canvas>
+        <div class="modal-actions">
+          <button id="stashBtn" type="button">Add to drawer</button>
+          <button id="downloadPngBtn" type="button">Save PNG</button>
+          <button id="downloadTxtBtn" type="button">Save TXT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js';
+
+    // ============================================================
+    // Little 3D Typewriter — v69 Startup Reliability
+    // Single-file GitHub Pages app.
+    //
+    // Code map:
+    // 1. DOM references + startup checks
+    // 2. Three.js scene setup
+    // 3. App state + constants
+    // 4. Geometry / 3D typewriter builders
+    // 5. Paper text model + typing behavior
+    // 6. Archive / Bookshelf data model
+    // 7. Modal + save / paste / export UI
+    // 8. Audio engine
+    // 9. Camera / events / animation / init
+    // ============================================================
+
+    const APP_VERSION = 'v69-startup-reliability';
+
+    // ------------------------------------------------------------
+    // 1. DOM references + startup checks
+    // ------------------------------------------------------------
+    const loadingOverlay = document.querySelector('#loadingOverlay');
+    const soundUnlockToast = document.querySelector('#soundUnlockToast');
+    const app = document.querySelector('#app');
+    const soundPresetBtn = document.querySelector('#soundPresetBtn');
+    const paperTypeBtn = document.querySelector('#paperTypeBtn');
+    const muteBtn = document.querySelector('#muteBtn');
+    const clearBtn = document.querySelector('#clearBtn');
+    const poetryBtn = document.querySelector('#poetryBtn');
+    const pasteBtn = document.querySelector('#pasteBtn');
+    const saveBtn = document.querySelector('#saveBtn');
+    const viewBtn = document.querySelector('#viewBtn');
+    const smallerBtn = document.querySelector('#smallerBtn');
+    const resetSizeBtn = document.querySelector('#resetSizeBtn');
+    const resetViewBtn = document.querySelector('#resetViewBtn');
+    const biggerBtn = document.querySelector('#biggerBtn');
+    const mobileKeys = document.querySelector('#mobileKeys');
+    const modalOverlay = document.querySelector('#modalOverlay');
+    const modalTitle = document.querySelector('#modalTitle');
+    const modalCloseBtn = document.querySelector('#modalCloseBtn');
+    const pastePanel = document.querySelector('#pastePanel');
+    const tuckPanel = document.querySelector('#tuckPanel');
+    const savePanel = document.querySelector('#savePanel');
+    const pasteInput = document.querySelector('#pasteInput');
+    const noteTypeSelect = document.querySelector('#noteTypeSelect');
+    const pasteBookInput = document.querySelector('#pasteBookInput');
+    const saveBookInput = document.querySelector('#saveBookInput');
+    const saveBookChips = document.querySelector('#saveBookChips');
+    const pasteAppendBtn = document.querySelector('#pasteAppendBtn');
+    const pasteNewBtn = document.querySelector('#pasteNewBtn');
+    const savePreview = document.querySelector('#savePreview');
+    const tuckPreview = document.querySelector('#tuckPreview');
+    const downloadPngBtn = document.querySelector('#downloadPngBtn');
+    const downloadTxtBtn = document.querySelector('#downloadTxtBtn');
+    const stashBtn = document.querySelector('#stashBtn');
+    const tuckBookChips = document.querySelector('#tuckBookChips');
+    const tuckConfirmBtn = document.querySelector('#tuckConfirmBtn');
+    const tuckDiscardBtn = document.querySelector('#tuckDiscardBtn');
+    const noteDrawer = document.querySelector('#noteDrawer');
+    const bookShelf = document.querySelector('#bookShelf');
+    const noteList = document.querySelector('#noteList');
+    const drawerCount = document.querySelector('#drawerCount');
+    const drawerToggleBtn = document.querySelector('#drawerToggleBtn');
+    const archivePanel = document.querySelector('#archivePanel');
+    const archivePreview = document.querySelector('#archivePreview');
+    const archiveInfo = document.querySelector('#archiveInfo');
+    const archiveMoveChips = document.querySelector('#archiveMoveChips');
+    const archivePrevBtn = document.querySelector('#archivePrevBtn');
+    const archivePageLabel = document.querySelector('#archivePageLabel');
+    const archiveNextBtn = document.querySelector('#archiveNextBtn');
+    const archivePutBackBtn = document.querySelector('#archivePutBackBtn');
+    const archiveDeleteBtn = document.querySelector('#archiveDeleteBtn');
+    const archiveSavePngBtn = document.querySelector('#archiveSavePngBtn');
+
+    const REQUIRED_DOM_REFS = {
+      loadingOverlay,
+      soundUnlockToast,
+      app,
+      soundPresetBtn,
+      paperTypeBtn,
+      muteBtn,
+      clearBtn,
+      poetryBtn,
+      pasteBtn,
+      saveBtn,
+      viewBtn,
+      smallerBtn,
+      resetSizeBtn,
+      resetViewBtn,
+      biggerBtn,
+      mobileKeys,
+      modalOverlay,
+      modalTitle,
+      modalCloseBtn,
+      pastePanel,
+      tuckPanel,
+      savePanel,
+      pasteInput,
+      noteTypeSelect,
+      pasteBookInput,
+      saveBookInput,
+      saveBookChips,
+      pasteAppendBtn,
+      pasteNewBtn,
+      savePreview,
+      tuckPreview,
+      downloadPngBtn,
+      downloadTxtBtn,
+      stashBtn,
+      tuckBookChips,
+      tuckConfirmBtn,
+      tuckDiscardBtn,
+      noteDrawer,
+      bookShelf,
+      noteList,
+      drawerCount,
+      drawerToggleBtn,
+      archivePanel,
+      archivePreview,
+      archiveInfo,
+      archiveMoveChips,
+      archivePrevBtn,
+      archivePageLabel,
+      archiveNextBtn,
+      archivePutBackBtn,
+      archiveDeleteBtn,
+      archiveSavePngBtn
+    };
+
+    function runStartupChecks() {
+      const missing = Object.entries(REQUIRED_DOM_REFS)
+        .filter(([, element]) => !element)
+        .map(([name]) => name);
+
+      if (missing.length) {
+        console.warn('[Little 3D Typewriter] Missing DOM refs:', missing.join(', '));
+      } else {
+        console.info(`[Little 3D Typewriter] ${APP_VERSION} ready: DOM refs OK.`);
+      }
+
+      if (typeof ensureAudioContext !== 'function') {
+        console.warn('[Little 3D Typewriter] Audio bootstrap missing: ensureAudioContext is not defined.');
+      }
+
+      if (typeof playKeySound !== 'function' || typeof playReturnSound !== 'function') {
+        console.warn('[Little 3D Typewriter] Audio functions missing.');
+      }
+
+      try {
+        localStorage.setItem('__little_typewriter_test__', '1');
+        localStorage.removeItem('__little_typewriter_test__');
+      } catch (error) {
+        console.warn('[Little 3D Typewriter] localStorage is not available:', error);
+      }
+    }
+
+    // Lightweight debug hook for future collaborative testing.
+    window.__littleTypewriterDebug = {
+      version: APP_VERSION,
+      getState: () => ({
+        currentDocumentType,
+        currentDocumentBook,
+        selectedBookFilter,
+        notebookView,
+        pendingTuckBook,
+        savedNotes: savedNotes.length,
+        storageKey: NOTEBOOK_STORAGE_KEY,
+        soundPreset,
+        lineEndBellLineIndex,
+        muted,
+        lines: [...textState.lines],
+        maxChars: textState.maxChars,
+        maxLines: textState.maxLines
+      }),
+      runStartupChecks
+    };
+
+    // ------------------------------------------------------------
+    // 2. Three.js scene setup
+    // ------------------------------------------------------------
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x2c201f, 16, 34);
+
+    const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 5.4, 10.8);
+    camera.lookAt(0, 1.4, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    app.appendChild(renderer.domElement);
+
+    const clock = new THREE.Clock();
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    const root = new THREE.Group();
+    root.position.y = -0.06;
+    scene.add(root);
+
+    const palette = {
+      cream: 0xf3d6a9,
+      honey: 0xd89655,
+      darkHoney: 0xa5613f,
+      cocoa: 0x55392f,
+      cocoaDark: 0x251a18,
+      ink: 0x2b2526,
+      paper: 0xfff6df,
+      brass: 0xd7a552,
+      blue: 0x7f9fbe,
+      blush: 0xd87b6c,
+      shadow: 0x1a1211
+    };
+
+    const mat = {
+      body: new THREE.MeshStandardMaterial({ color: palette.honey, roughness: 0.78, metalness: 0.05 }),
+      bodyDark: new THREE.MeshStandardMaterial({ color: palette.darkHoney, roughness: 0.84, metalness: 0.04 }),
+      key: new THREE.MeshStandardMaterial({ color: palette.cream, roughness: 0.62, metalness: 0.02 }),
+      keyRim: new THREE.MeshStandardMaterial({ color: palette.cocoaDark, roughness: 0.5, metalness: 0.18 }),
+      metal: new THREE.MeshStandardMaterial({ color: palette.brass, roughness: 0.38, metalness: 0.58 }),
+      rubber: new THREE.MeshStandardMaterial({ color: palette.cocoaDark, roughness: 0.92, metalness: 0.02 }),
+      paper: new THREE.MeshStandardMaterial({ color: palette.paper, roughness: 0.95, side: THREE.DoubleSide }),
+      shadow: new THREE.MeshStandardMaterial({ color: palette.shadow, roughness: 0.9 })
+    };
+
+    const typewriter = new THREE.Group();
+    root.add(typewriter);
+
+    const keyMeshes = new Map();
+    const clickable = [];
+    const typebars = [];
+    let bodyWobble = 0;
+    let carriageJiggle = 0;
+    // ------------------------------------------------------------
+    // 3. App state + constants
+    // ------------------------------------------------------------
+    let carriageTargetX = 0;
+    let paperTargetY = 0;
+    let dragYaw = 0;
+    let dragPitch = 0;
+    let viewMode = 'display';
+    let typewriterScale = 1;
+    let muted = false;
+    let soundPreset = 'hard';
+    let audioCtx = null;
+    let soundWasUnlocked = false;
+    let soundToastTimer = null;
+
+    function showSoundUnlockToast(message = 'Sound unlocked ✓') {
+      if (!soundUnlockToast) return;
+      soundUnlockToast.textContent = message;
+      soundUnlockToast.classList.add('show');
+      clearTimeout(soundToastTimer);
+      soundToastTimer = setTimeout(() => soundUnlockToast.classList.remove('show'), 1200);
+    }
+
+    function ensureAudioContext() {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return false;
+      if (!audioCtx) audioCtx = new AudioContextClass();
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      if (audioCtx.state === 'running' && !soundWasUnlocked) {
+        soundWasUnlocked = true;
+        showSoundUnlockToast();
+      }
+      return true;
+    }
+
+    function unlockSoundFromGesture({ preview = false } = {}) {
+      const ok = ensureAudioContext();
+      if (!ok || !audioCtx) return false;
+
+      const playPreview = () => {
+        if (!muted && preview) playKeySound('char');
+      };
+
+      if (audioCtx.state === 'running') {
+        if (!soundWasUnlocked) {
+          soundWasUnlocked = true;
+          showSoundUnlockToast();
+        }
+        playPreview();
+        return true;
+      }
+
+      audioCtx.resume()
+        .then(() => {
+          soundWasUnlocked = true;
+          showSoundUnlockToast();
+          playPreview();
+        })
+        .catch(error => {
+          console.warn('[Little 3D Typewriter] Audio unlock failed:', error);
+        });
+
+      return true;
+    }
+
+    let poetryRunning = false;
+    let archivedSheetCount = 0;
+    const flyingSheets = [];
+    const savedNotes = [];
+    let activeArchiveIndex = -1;
+    let activeArchivePage = 0;
+    let currentDocumentType = 'plain';
+    let currentDocumentBook = 'Inbox';
+    let currentPrintBundle = null;
+    let pendingTuckEntry = null;
+    let pendingTuckBook = 'Inbox';
+    let selectedBookFilter = 'All';
+    let notebookView = 'shelf';
+    let lineEndBellLineIndex = -1;
+
+    const textState = {
+      lines: [''],
+      maxChars: 30,
+      maxLines: 9,
+      cursorVisible: true,
+      cursorTimer: 0
+    };
+
+    // ------------------------------------------------------------
+    // 4. Geometry / 3D typewriter builders
+    // ------------------------------------------------------------
+    function roundedShape(width, height, radius) {
+      const w = width / 2;
+      const h = height / 2;
+      const r = Math.min(radius, width / 2, height / 2);
+      const shape = new THREE.Shape();
+      shape.moveTo(-w + r, -h);
+      shape.lineTo(w - r, -h);
+      shape.quadraticCurveTo(w, -h, w, -h + r);
+      shape.lineTo(w, h - r);
+      shape.quadraticCurveTo(w, h, w - r, h);
+      shape.lineTo(-w + r, h);
+      shape.quadraticCurveTo(-w, h, -w, h - r);
+      shape.lineTo(-w, -h + r);
+      shape.quadraticCurveTo(-w, -h, -w + r, -h);
+      return shape;
+    }
+
+    function roundedBox(width, height, depth, radius, material, bevel = 0.025) {
+      const geometry = new THREE.ExtrudeGeometry(roundedShape(width, height, radius), {
+        depth,
+        bevelEnabled: true,
+        bevelSize: bevel,
+        bevelThickness: bevel,
+        bevelSegments: 4,
+        steps: 1
+      });
+      geometry.center();
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    function box(width, height, depth, material) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    function cylinder(radius, height, material, segments = 48) {
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, segments), material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    function createTextTexture(label, width = 128, height = 128, fontSize = 56) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, width, height);
+
+      const isPunct = /^[,\.\?!'\-]$/.test(label);
+      const punctOffset = {
+        ',': 16,
+        '.': 16,
+        '?': 2,
+        '!': 2,
+        "'": -14,
+        '-': 2
+      };
+
+      ctx.fillStyle = '#1f1715';
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      ctx.lineWidth = isPunct ? 8 : 0;
+      const family = isPunct ? '"Courier New", ui-monospace, monospace' : 'ui-rounded, system-ui, sans-serif';
+      const size = isPunct ? Math.round(fontSize * 1.2) : fontSize;
+      ctx.font = `950 ${size}px ${family}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const y = height / 2 + (isPunct ? (punctOffset[label] ?? 2) : 2);
+      if (isPunct) ctx.strokeText(label, width / 2, y);
+      ctx.fillText(label, width / 2, y);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    function createKey(label, x, z, opts = {}) {
+      const width = opts.width || 0.46;
+      const depth = opts.depth || 0.46;
+      const baseY = opts.y || 1.02;
+      const key = new THREE.Group();
+      key.position.set(x, baseY, z);
+      key.userData = { label, baseY, press: 0, width, isSpecial: !!opts.special };
+
+      const capMaterial = opts.capMaterial || mat.key;
+      let cap;
+      if (opts.round === false || width > 0.55) {
+        cap = roundedBox(width, 0.16, depth, 0.08, capMaterial, 0.018);
+        cap.rotation.x = -0.04;
+      } else {
+        const rim = cylinder(width * 0.52, 0.12, mat.keyRim, 40);
+        rim.position.y = -0.03;
+        key.add(rim);
+        cap = cylinder(width * 0.43, 0.13, capMaterial, 40);
+      }
+
+      cap.position.y = 0.02;
+      key.add(cap);
+
+      if (opts.hitWidth || opts.hitDepth) {
+        const hitArea = new THREE.Mesh(
+          new THREE.BoxGeometry(opts.hitWidth || width, 0.34, opts.hitDepth || depth),
+          new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 })
+        );
+        hitArea.position.y = 0.06;
+        key.add(hitArea);
+        clickable.push(hitArea);
+        hitArea.userData.keyLabel = label.toUpperCase();
+      }
+
+      if (!opts.hideLabel) {
+        if (opts.labelSprite) {
+          const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: createTextTexture(opts.labelText || label, 256, 128, opts.fontSize || 54),
+            transparent: true,
+            depthWrite: false
+          }));
+          sprite.scale.set(opts.spriteScaleX || 0.28, opts.spriteScaleY || 0.16, 1);
+          sprite.position.set(0, opts.labelYOffset || 0.18, 0);
+          sprite.renderOrder = 4;
+          key.add(sprite);
+        } else {
+          const labelPlane = new THREE.Mesh(
+            new THREE.PlaneGeometry(
+              Math.min(width * (opts.labelScaleX || 0.98), 0.96),
+              Math.min(depth * (opts.labelScaleY || 0.86), 0.42)
+            ),
+            new THREE.MeshBasicMaterial({
+              map: createTextTexture(opts.labelText || label, 256, 128, opts.fontSize || 54),
+              transparent: true,
+              alphaTest: 0.08,
+              depthWrite: false,
+              side: THREE.DoubleSide,
+              polygonOffset: true,
+              polygonOffsetFactor: -4,
+              polygonOffsetUnits: -4
+            })
+          );
+          labelPlane.rotation.x = opts.labelTilt ?? -Math.PI / 2;
+          labelPlane.position.y = opts.labelYOffset || 0.116;
+          labelPlane.renderOrder = 3;
+          key.add(labelPlane);
+        }
+      }
+
+      typewriter.add(key);
+      keyMeshes.set(label.toUpperCase(), key);
+      clickable.push(cap);
+      cap.userData.keyLabel = label.toUpperCase();
+      return key;
+    }
+
+
+    function addFrontKeyBases() {
+      const labels = ['Z','X','C','V','B','N','M'];
+      labels.forEach(label => {
+        const key = keyMeshes.get(label);
+        if (!key) return;
+        const width = key.userData.width || (label === 'SPACE' ? 2.85 : 0.46);
+        const depth = label === 'SPACE' ? 0.34 : 0.46;
+        const base = roundedBox(width * 0.96, 0.07, depth * 0.96, label === 'SPACE' ? 0.08 : 0.12, mat.keyRim, 0.01);
+        base.position.y = label === 'SPACE' ? -0.04 : -0.05;
+        base.position.z = 0.004;
+        key.add(base);
+      });
+    }
+
+
+    function addSpacebarHighlight() {
+      const key = keyMeshes.get('SPACE');
+      if (!key) return;
+      const gloss = roundedBox(1.04, 0.035, 0.08, 0.03, new THREE.MeshStandardMaterial({ color: 0x6b5955, roughness: 0.42, metalness: 0.08 }), 0.012);
+      gloss.position.set(0, 0.105, -0.015);
+      gloss.rotation.x = -0.06;
+      key.add(gloss);
+    }
+    function addPunctuationGlyphs() {
+      const glyphMat = new THREE.MeshStandardMaterial({ color: 0x1f1715, roughness: 0.42, metalness: 0.04 });
+
+      // Build glyph pieces so they lie flat on the keycap top: wide in X/Z, thin in Y.
+      function flatBox(w, h, t = 0.01) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, t, h), glyphMat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        return mesh;
+      }
+
+      function addGlyph(label, builder) {
+        const key = keyMeshes.get(label.toUpperCase());
+        if (!key) return;
+        const group = new THREE.Group();
+        group.position.set(0, 0.118, 0.0);
+        group.rotation.x = -0.04;
+        group.scale.z = -1;
+        group.renderOrder = 5;
+        builder(group);
+        key.add(group);
+      }
+
+      addGlyph('.', group => {
+        const dot = flatBox(0.04, 0.04);
+        dot.position.set(0, 0, 0.0);
+        group.add(dot);
+      });
+
+      addGlyph(',', group => {
+        const dot = flatBox(0.038, 0.038);
+        dot.position.set(-0.003, 0, 0.012);
+        group.add(dot);
+        const tail = flatBox(0.014, 0.05);
+        tail.position.set(0.018, 0, -0.038);
+        tail.rotation.y = -0.34;
+        group.add(tail);
+      });
+
+      addGlyph('-', group => {
+        const dash = flatBox(0.12, 0.018);
+        dash.position.set(0, 0, 0.0);
+        group.add(dash);
+      });
+
+      addGlyph("'", group => {
+        const tick = flatBox(0.018, 0.068);
+        tick.position.set(0.0, 0, 0.018);
+        tick.rotation.y = 0.22;
+        group.add(tick);
+      });
+
+      addGlyph('!', group => {
+        const stem = flatBox(0.02, 0.1);
+        stem.position.set(0, 0, 0.02);
+        group.add(stem);
+        const dot = flatBox(0.028, 0.028);
+        dot.position.set(0, 0, -0.065);
+        group.add(dot);
+      });
+
+      addGlyph('?', group => {
+        // A cleaner flat question mark using horizontal + vertical pieces on the cap.
+        const top = flatBox(0.088, 0.016);
+        top.position.set(0.0, 0, 0.055);
+        group.add(top);
+
+        const rightStem = flatBox(0.016, 0.042);
+        rightStem.position.set(0.036, 0, 0.025);
+        group.add(rightStem);
+
+        const mid = flatBox(0.056, 0.016);
+        mid.position.set(0.008, 0, -0.002);
+        group.add(mid);
+
+        const drop = flatBox(0.016, 0.038);
+        drop.position.set(-0.012, 0, -0.038);
+        group.add(drop);
+
+        const dot = flatBox(0.026, 0.026);
+        dot.position.set(-0.012, 0, -0.085);
+        group.add(dot);
+      });
+    }
+
+    function buildTypewriter() {
+      const base = roundedBox(8.8, 0.72, 4.35, 0.42, mat.body, 0.055);
+      base.position.set(0, 0.38, 0.65);
+      typewriter.add(base);
+
+      const frontLip = roundedBox(8.5, 0.36, 0.66, 0.18, mat.bodyDark, 0.035);
+      frontLip.position.set(0, 0.68, 2.66);
+      typewriter.add(frontLip);
+
+      const keyboardDeck = roundedBox(7.8, 0.28, 2.85, 0.28, mat.bodyDark, 0.035);
+      keyboardDeck.position.set(0, 0.82, 0.95);
+      keyboardDeck.rotation.x = -0.14;
+      typewriter.add(keyboardDeck);
+
+      const rearShell = roundedBox(8.25, 1.65, 2.05, 0.38, mat.body, 0.05);
+      rearShell.position.set(0, 1.24, -1.30);
+      rearShell.rotation.x = 0.08;
+      typewriter.add(rearShell);
+
+      const basket = roundedBox(3.5, 0.64, 0.7, 0.2, mat.rubber, 0.03);
+      basket.position.set(0, 1.34, -0.30);
+      basket.rotation.x = -0.05;
+      typewriter.add(basket);
+
+      createCarriage();
+      createKeyboard();
+      createTypebars();
+      createDecor();
+      addFrontKeyBases();
+      addSpacebarHighlight();
+      addPunctuationGlyphs();
+    }
+
+    const carriage = new THREE.Group();
+    const paperGroup = new THREE.Group();
+    const archivePile = new THREE.Group();
+    let paperTexture;
+    let paperMesh;
+
+    function createCarriage() {
+      carriage.position.set(0, 0, 0);
+      typewriter.add(carriage);
+
+      const rail = roundedBox(6.6, 0.13, 0.16, 0.04, mat.metal, 0.012);
+      rail.position.set(0, 1.76, -1.02);
+      carriage.add(rail);
+
+      const platen = cylinder(0.32, 5.7, mat.rubber, 56);
+      platen.rotation.z = Math.PI / 2;
+      platen.position.set(0, 1.95, -1.26);
+      carriage.add(platen);
+
+      const rollerHighlight = cylinder(0.325, 5.73, new THREE.MeshStandardMaterial({ color: 0x45302c, roughness: 0.76, metalness: 0.02 }), 56);
+      rollerHighlight.rotation.z = Math.PI / 2;
+      rollerHighlight.rotation.x = 0.35;
+      rollerHighlight.position.copy(platen.position);
+      rollerHighlight.scale.set(1, 0.04, 1);
+      carriage.add(rollerHighlight);
+
+      const knobL = cylinder(0.42, 0.34, mat.bodyDark, 48);
+      knobL.rotation.z = Math.PI / 2;
+      knobL.position.set(-3.17, 1.95, -1.26);
+      carriage.add(knobL);
+
+      const knobR = knobL.clone();
+      knobR.position.x = 3.17;
+      carriage.add(knobR);
+
+      const paperCanvas = document.createElement('canvas');
+      paperCanvas.width = 1024;
+      paperCanvas.height = 720;
+      paperTexture = new THREE.CanvasTexture(paperCanvas);
+      paperTexture.colorSpace = THREE.SRGBColorSpace;
+      mat.paper.map = paperTexture;
+      mat.paper.needsUpdate = true;
+
+      paperGroup.position.set(0, 2.95, -1.62);
+      carriage.add(paperGroup);
+
+      paperMesh = new THREE.Mesh(new THREE.PlaneGeometry(4.75, 3.35, 10, 10), mat.paper);
+      paperMesh.castShadow = true;
+      paperMesh.receiveShadow = true;
+      paperGroup.add(paperMesh);
+
+      const clipTop = roundedBox(5.0, 0.12, 0.1, 0.04, mat.metal, 0.01);
+      clipTop.position.set(0, 1.78, -1.58);
+      carriage.add(clipTop);
+
+      archivePile.position.set(6.45, 0.22, 0.18);
+      typewriter.add(archivePile);
+
+      updatePaperTexture();
+    }
+
+    function createKeyboard() {
+      const rows = [
+        { chars: '1234567890', z: 0.24, y: 1.18, offset: -2.79, step: 0.62 },
+        { chars: 'QWERTYUIOP', z: 0.86, y: 1.12, offset: -2.79, step: 0.62 },
+        { chars: 'ASDFGHJKL', z: 1.42, y: 1.07, offset: -2.48, step: 0.62 },
+        { chars: 'ZXCVBNM', z: 1.96, y: 1.14, offset: -2.10, step: 0.72 }
+      ];
+      rows.forEach(row => {
+        [...row.chars].forEach((char, i) => {
+          const wobble = Math.sin((i + row.z) * 1.7) * 0.016;
+          createKey(char, row.offset + i * row.step + wobble, row.z + Math.cos(i) * 0.008, { y: row.y, fontSize: 82 });
+        });
+      });
+
+      createKey('TAB', -3.55, 0.86, { width: 0.78, depth: 0.45, y: 1.12, special: true, round: false, fontSize: 52 });
+      createKey('BACK', 3.55, 0.24, { width: 0.92, depth: 0.45, y: 1.18, special: true, round: false, fontSize: 48 });
+      createKey('ENTER', 3.25, 1.42, { width: 1.02, depth: 0.48, y: 1.07, special: true, round: false, fontSize: 46, hitWidth: 1.2, hitDepth: 0.72 });
+      // Visible second-layer spacebar
+      createKey('SPACE', 0, 2.54, { width: 1.72, depth: 0.28, y: 0.93, special: true, round: false, hideLabel: true, capMaterial: mat.rubber, hitWidth: 2.4, hitDepth: 0.6 });
+
+      // Common punctuation keys around the spacebar
+      const punctY = 0.94;
+      const punctZ = 2.56;
+      createKey(',', -2.26, punctZ, { width: 0.38, depth: 0.34, y: punctY, special: true, round: false, hideLabel: true, hitWidth: 0.5, hitDepth: 0.46 });
+      createKey('.', -1.72, punctZ, { width: 0.38, depth: 0.34, y: punctY, special: true, round: false, hideLabel: true, hitWidth: 0.5, hitDepth: 0.46 });
+      createKey('?', -1.18, punctZ, { width: 0.38, depth: 0.34, y: punctY, special: true, round: false, hideLabel: true, hitWidth: 0.5, hitDepth: 0.46 });
+      createKey('!', 1.18, punctZ, { width: 0.38, depth: 0.34, y: punctY, special: true, round: false, hideLabel: true, hitWidth: 0.5, hitDepth: 0.46 });
+      createKey("'", 1.72, punctZ, { width: 0.38, depth: 0.34, y: punctY, special: true, round: false, hideLabel: true, hitWidth: 0.5, hitDepth: 0.46 });
+      createKey('-', 2.26, punctZ, { width: 0.38, depth: 0.34, y: punctY, special: true, round: false, hideLabel: true, hitWidth: 0.5, hitDepth: 0.46 });
+    }
+
+    function createTypebars() {
+      const barMaterial = new THREE.MeshStandardMaterial({ color: 0x3a2825, roughness: 0.44, metalness: 0.62 });
+      for (let i = 0; i < 23; i++) {
+        const angle = THREE.MathUtils.mapLinear(i, 0, 22, -0.95, 0.95);
+        const bar = box(0.035, 0.06, 1.36, barMaterial);
+        bar.position.set(Math.sin(angle) * 1.3, 1.36, -0.16 + Math.cos(angle) * 0.06);
+        bar.rotation.y = angle;
+        bar.rotation.x = -0.78;
+        bar.userData = { baseX: bar.rotation.x, baseY: angle, hit: 0 };
+        typewriter.add(bar);
+        typebars.push(bar);
+      }
+
+      const impact = cylinder(0.08, 0.04, new THREE.MeshStandardMaterial({ color: palette.blush, roughness: 0.48, emissive: 0x2b0808, emissiveIntensity: 0.2 }), 24);
+      impact.name = 'impactDot';
+      impact.rotation.x = Math.PI / 2;
+      impact.position.set(0, 1.88, -0.92);
+      impact.scale.setScalar(0.001);
+      typewriter.add(impact);
+    }
+
+    function createDecor() {
+      const returnLever = new THREE.Group();
+      const stem = box(0.08, 0.08, 1.55, mat.metal);
+      stem.rotation.z = -0.45;
+      stem.rotation.y = 0.2;
+      stem.position.set(-3.78, 2.27, -0.94);
+      returnLever.add(stem);
+      const bead = cylinder(0.18, 0.18, mat.bodyDark, 32);
+      bead.rotation.z = Math.PI / 2;
+      bead.position.set(-4.18, 2.55, -0.36);
+      returnLever.add(bead);
+      typewriter.add(returnLever);
+
+      for (const x of [-3.7, 3.7]) {
+        const foot = roundedBox(0.82, 0.18, 0.5, 0.12, mat.rubber, 0.012);
+        foot.position.set(x, 0.05, 2.28);
+        typewriter.add(foot);
+      }
+
+      const shine = new THREE.Mesh(
+        new THREE.PlaneGeometry(3.7, 0.08),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 })
+      );
+      shine.position.set(-0.3, 1.61, -2.05);
+      shine.rotation.x = -0.12;
+      typewriter.add(shine);
+    }
+
+    function createMobileKeyboard() {
+      const rows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+      rows.forEach(row => {
+        const el = document.createElement('div');
+        el.className = 'mobile-row';
+        [...row].forEach(char => el.appendChild(mobileKey(char)));
+        mobileKeys.appendChild(el);
+      });
+
+      const punct = document.createElement('div');
+      punct.className = 'mobile-row';
+      [',', '.', '?', '!', "'", '-'].forEach(char => punct.appendChild(mobileKey(char)));
+      mobileKeys.appendChild(punct);
+
+      const specials = document.createElement('div');
+      specials.className = 'mobile-row';
+      specials.appendChild(mobileKey('BACK', 'wide'));
+      specials.appendChild(mobileKey('SPACE', 'space'));
+      specials.appendChild(mobileKey('ENTER', 'wide'));
+      mobileKeys.appendChild(specials);
+    }
+
+    function mobileKey(label, cls = '') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `mobile-key ${cls}`;
+      button.textContent = label === 'SPACE' ? 'space' : label === 'BACK' ? '⌫' : label === 'ENTER' ? 'return' : label;
+      button.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        handleVirtualKey(label);
+      });
+      return button;
+    }
+
+    // ------------------------------------------------------------
+    // 5. Paper text model + typing behavior
+    // ------------------------------------------------------------
+    function updatePaperTexture() {
+      const canvas = paperTexture.image;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const gradient = ctx.createLinearGradient(0, 0, w, h);
+      gradient.addColorStop(0, '#fff9e8');
+      gradient.addColorStop(0.58, '#fbecd0');
+      gradient.addColorStop(1, '#edd8b8');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = 'rgba(105, 74, 55, 0.12)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(42, 34, w - 84, h - 68);
+
+      ctx.strokeStyle = 'rgba(126, 79, 72, 0.09)';
+      ctx.lineWidth = 2;
+      for (let y = 142; y < h - 48; y += 42) {
+        ctx.beginPath();
+        ctx.moveTo(82, y);
+        ctx.lineTo(w - 78, y);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = 'rgba(74, 50, 42, 0.12)';
+      ctx.fillRect(104, 0, 3, h);
+
+      ctx.fillStyle = '#382821';
+      ctx.font = '700 42px "Courier New", ui-monospace, monospace';
+      ctx.textBaseline = 'top';
+
+      const startX = 126;
+      const startY = 88;
+      const lineHeight = 50;
+      textState.lines.forEach((line, i) => {
+        ctx.save();
+        ctx.globalAlpha = 0.94;
+        const imperfectX = Math.sin((i + 1) * 7.1) * 1.6;
+        ctx.fillText(line, startX + imperfectX, startY + i * lineHeight);
+        ctx.restore();
+      });
+
+      const currentLine = textState.lines[textState.lines.length - 1] || '';
+      if (textState.cursorVisible) {
+        const cursorX = startX + ctx.measureText(currentLine).width + 2;
+        const cursorY = startY + (textState.lines.length - 1) * lineHeight + 2;
+        ctx.fillStyle = 'rgba(56, 40, 33, 0.75)';
+        ctx.fillRect(cursorX, cursorY, 16, 38);
+      }
+
+      // Soft fingerprints and paper grain.
+      for (let i = 0; i < 90; i++) {
+        const x = (Math.sin(i * 41.7) * 0.5 + 0.5) * w;
+        const y = (Math.cos(i * 19.3) * 0.5 + 0.5) * h;
+        ctx.fillStyle = `rgba(85, 57, 47, ${0.015 + (i % 7) * 0.003})`;
+        ctx.fillRect(x, y, 1.4, 1.4);
+      }
+
+      paperTexture.needsUpdate = true;
+    }
+
+    function isWordChar(char) {
+      return !!char && /[A-Za-z0-9]/.test(char);
+    }
+
+    function shouldHyphenateWrap(line, incomingChar) {
+      if (!line || !incomingChar) return false;
+      if (!isWordChar(incomingChar)) return false;
+      const last = line[line.length - 1];
+      if (!isWordChar(last)) return false;
+      if (line.endsWith('-')) return false;
+      return true;
+    }
+
+    function appendCharacter(char) {
+      if (!char || char.length !== 1) return;
+      let line = textState.lines[textState.lines.length - 1];
+      if (line.length >= textState.maxChars) {
+        if (shouldHyphenateWrap(line, char)) {
+          textState.lines[textState.lines.length - 1] = line + '-';
+          updateCarriageTarget();
+          updatePaperTexture();
+        }
+        if (textState.lines.length >= textState.maxLines) advancePageIfNeeded();
+        else newLine(false);
+      }
+      line = textState.lines[textState.lines.length - 1];
+      textState.lines[textState.lines.length - 1] = line + char;
+      trimLines();
+      updateCarriageTarget();
+      updatePaperTexture();
+    }
+
+    function newLine(withReturnSound = true) {
+      if (textState.lines.length >= textState.maxLines) {
+        advancePageIfNeeded();
+        return;
+      }
+      textState.lines.push(linePrefixForDocument());
+      lineEndBellLineIndex = -1;
+      trimLines();
+      updateCarriageTarget();
+      paperTargetY = Math.min(0.54, (textState.lines.length - 1) * 0.034);
+      if (withReturnSound) {
+        playReturnSound();
+        playBellSound(0.18);
+      } else {
+        playBellSound(0.035);
+      }
+      pulseBody(0.0026);
+      updatePaperTexture();
+    }
+
+    function backspace() {
+      let line = textState.lines[textState.lines.length - 1];
+      if (line.length > 0) {
+        textState.lines[textState.lines.length - 1] = line.slice(0, -1);
+      } else if (textState.lines.length > 1) {
+        textState.lines.pop();
+      }
+      paperTargetY = Math.min(0.54, (textState.lines.length - 1) * 0.034);
+      if ((textState.lines[textState.lines.length - 1] || '').length < textState.maxChars - 6) {
+        lineEndBellLineIndex = -1;
+      }
+      updateCarriageTarget();
+      updatePaperTexture();
+    }
+
+    function trimLines() {
+      if (textState.lines.length > textState.maxLines) textState.lines = textState.lines.slice(0, textState.maxLines);
+    }
+
+    function updateCarriageTarget() {
+      const line = textState.lines[textState.lines.length - 1] || '';
+      carriageTargetX = Math.min(1.32, line.length * 0.043);
+    }
+
+    function handlePhysicalKey(event) {
+      if (!modalOverlay.classList.contains('hidden')) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      const key = event.key;
+      if (key === 'Backspace') {
+        event.preventDefault();
+        pressTypewriterKey('BACK');
+        backspace();
+        playKeySound('back');
+        return;
+      }
+      if (key === 'Enter') {
+        event.preventDefault();
+        pressTypewriterKey('ENTER');
+        newLine(true);
+        return;
+      }
+      if (key === 'Tab') {
+        event.preventDefault();
+        pressTypewriterKey('TAB');
+        typeText('    ', 0);
+        return;
+      }
+      if (key === ' ') {
+        event.preventDefault();
+        pressTypewriterKey('SPACE');
+        appendCharacter(' ');
+        playKeySound('space');
+        return;
+      }
+      if (key.length === 1) {
+        const typed = key.toUpperCase();
+        pressTypewriterKey(typed);
+        appendCharacter(typed);
+        playKeySound('char');
+      }
+    }
+
+    function handleVirtualKey(label) {
+      ensureAudioContext();
+      pressTypewriterKey(label);
+      if (label === 'BACK') {
+        backspace();
+        playKeySound('back');
+      } else if (label === 'ENTER') {
+        newLine(true);
+      } else if (label === 'SPACE') {
+        appendCharacter(' ');
+        playKeySound('space');
+      } else if (label === 'TAB') {
+        typeText('    ', 0);
+      } else {
+        appendCharacter(label);
+        playKeySound('char');
+      }
+    }
+
+    function pressTypewriterKey(label) {
+      const normalized = label.toUpperCase();
+      const mesh = keyMeshes.get(normalized) || keyMeshes.get(normalized[0]);
+      if (mesh) mesh.userData.press = 1;
+      pulseBody(normalized === 'ENTER' ? 0.0024 : normalized === 'SPACE' ? 0.0015 : 0.0011);
+      activateTypebar(normalized);
+    }
+
+    function activateTypebar(label) {
+      const impact = typewriter.getObjectByName('impactDot');
+      const index = Math.abs([...label].reduce((sum, char) => sum + char.charCodeAt(0), 0)) % typebars.length;
+      const bar = typebars[index];
+      bar.userData.hit = 1;
+      if (impact) impact.scale.setScalar(1);
+    }
+
+    function pulseBody(amount) {
+      bodyWobble = Math.max(bodyWobble, amount);
+      carriageJiggle = Math.max(carriageJiggle, amount * 2.2);
+    }
+
+    function humanTypingDelay(char, previousChar, baseDelay, typedCount = 0) {
+      if (!baseDelay) return 0;
+
+      let wait = baseDelay + Math.random() * baseDelay * 0.48;
+
+      // The tiny human inside pauses after meaning, not only after letters.
+      if (/[。！？.!?]/.test(previousChar || '')) wait += 150 + Math.random() * 260;
+      else if (/[，,;；:：]/.test(previousChar || '')) wait += 70 + Math.random() * 150;
+      else if ((previousChar || '') === '\n') wait += 150 + Math.random() * 250;
+      else if ((previousChar || '') === ' ') {
+        if (Math.random() < 0.16) wait += 38 + Math.random() * 95;
+      }
+
+      // Before some words, the typist thinks for half a breath.
+      const beforeWord = (previousChar === ' ' || previousChar === '\n') && /[A-Za-z0-9]/.test(char);
+      if (beforeWord && Math.random() < 0.040) wait += 170 + Math.random() * 330;
+
+      // Long runs get tiny fatigue/attention pauses.
+      if (typedCount > 0 && typedCount % (34 + Math.floor(Math.random() * 14)) === 0) {
+        wait += 110 + Math.random() * 220;
+      }
+
+      return wait;
+    }
+
+    async function typeText(text, delay = 68) {
+      if (poetryRunning && delay > 0) return;
+      poetryRunning = delay > 0;
+      let previousChar = '';
+      let typedCount = 0;
+      try {
+        for (const char of text) {
+          if (char === '\n') {
+            await sleep(delay > 0 ? 120 + Math.random() * 240 : 0);
+            pressTypewriterKey('ENTER');
+            newLine(true);
+          } else if (char === ' ') {
+            pressTypewriterKey('SPACE');
+            appendCharacter(' ');
+            playKeySound('space');
+          } else {
+            const typed = char.toUpperCase();
+            pressTypewriterKey(typed);
+            appendCharacter(typed);
+            playKeySound('char');
+          }
+
+          typedCount += 1;
+          if (delay > 0) await sleep(humanTypingDelay(char, previousChar, delay, typedCount));
+          previousChar = char;
+        }
+      } finally {
+        poetryRunning = false;
+      }
+    }
+
+        async function typeTextWithMistakes(text, delay = 68) {
+      if (poetryRunning && delay > 0) return;
+      poetryRunning = delay > 0;
+      let previousChar = '';
+      let typedCount = 0;
+
+      try {
+        for (const char of text) {
+          const beforeWord = (previousChar === ' ' || previousChar === '\n') && /^[A-Za-z]$/.test(char);
+          if (delay > 0 && beforeWord && Math.random() < 0.045) {
+            await sleep(150 + Math.random() * 300);
+          }
+
+          const canMistake = /^[A-Za-z]$/.test(char) && Math.random() < 0.042;
+          if (canMistake) {
+            const wrong = randomWrongLetter(char);
+            const wrongTyped = wrong.toUpperCase();
+
+            // A very human false start: hesitate, tap, notice, erase.
+            if (delay > 0 && Math.random() < 0.42) await sleep(60 + Math.random() * 160);
+            pressTypewriterKey(wrongTyped);
+            appendCharacter(wrongTyped);
+            playKeySound('char');
+            await sleep(Math.max(320, delay * (4.2 + Math.random() * 1.6)));
+
+            pressTypewriterKey('BACK');
+            backspace();
+            playKeySound('back');
+            await sleep(Math.max(170, delay * (1.9 + Math.random() * 0.9)));
+          }
+
+          if (char === '\n') {
+            await sleep(delay > 0 ? 110 + Math.random() * 230 : 0);
+            pressTypewriterKey('ENTER');
+            newLine(true);
+          } else if (char === ' ') {
+            pressTypewriterKey('SPACE');
+            appendCharacter(' ');
+            playKeySound('space');
+          } else {
+            const typed = char.length === 1 && /[a-z]/.test(char) ? char.toUpperCase() : char;
+            const keyLabel = typed.toUpperCase ? typed.toUpperCase() : typed;
+            pressTypewriterKey(keyLabel);
+            appendCharacter(typed);
+            playKeySound('char');
+          }
+
+          typedCount += 1;
+          if (delay > 0) await sleep(humanTypingDelay(char, previousChar, delay, typedCount));
+          previousChar = char;
+        }
+      } finally {
+        poetryRunning = false;
+      }
+    }
+
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function randomWrongLetter(original) {
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const upper = original.toUpperCase();
+      let pick = upper;
+      while (pick === upper) pick = alphabet[Math.floor(Math.random() * alphabet.length)];
+      return original === original.toLowerCase() ? pick.toLowerCase() : pick;
+    }
+
+    function noteAsText() {
+      return textState.lines.join('\n').replace(/\s+$/g, '');
+    }
+
+    function clonePaperTexture() {
+      const source = paperTexture.image;
+      const canvas = document.createElement('canvas');
+      canvas.width = source.width;
+      canvas.height = source.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(source, 0, 0);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    function clonePaperCanvas() {
+      const source = paperTexture.image;
+      const canvas = document.createElement('canvas');
+      canvas.width = source.width;
+      canvas.height = source.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(source, 0, 0);
+      return canvas;
+    }
+
+    const stampPool = [
+      'TYPED BY LITTLE POET',
+      'INK STILL WARM',
+      'FOUND ON THE DESK',
+      'MOONLIT COPY',
+      'DRAFT NO.',
+      'SMALL MACHINE ARCHIVE',
+      '小打字机存档',
+      '今日纸条'
+    ];
+
+    function formatTimestamp(date = new Date()) {
+      const pad = value => String(value).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} · ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function titleFromLines(lines) {
+      const first = (lines.find(line => line.trim()) || 'Untitled slip').trim();
+      const clean = first.replace(/\s+/g, ' ');
+      return clean.length > 26 ? clean.slice(0, 26) + '…' : clean;
+    }
+
+    function drawStamp(canvas, stampText) {
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.translate(canvas.width - 215, canvas.height - 112);
+      ctx.rotate(-0.08);
+      ctx.strokeStyle = 'rgba(126, 60, 48, 0.34)';
+      ctx.fillStyle = 'rgba(126, 60, 48, 0.30)';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([8, 5]);
+      ctx.strokeRect(-6, -34, 188, 54);
+      ctx.setLineDash([]);
+      ctx.font = '700 21px "Courier New", ui-monospace, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(stampText, 88, -8, 170);
+      ctx.restore();
+    }
+
+    // ------------------------------------------------------------
+    // 6. Archive / Bookshelf data model
+    // ------------------------------------------------------------
+    function noteTitle(index) {
+      return savedNotes[index]?.title || `Slip ${String(index + 1).padStart(2, '0')}`;
+    }
+
+    function prettifyNoteType(kind = 'plain') {
+      const map = {
+        plain: 'Plain note',
+        bullets: 'Bullet note',
+        checklist: 'Checklist',
+        shopping: 'Shopping list',
+        plan: 'Plan',
+        poetry: 'Poetry'
+      };
+      return map[kind] || 'Note';
+    }
+
+    function suggestBookFromType(kind = 'plain') {
+      const map = {
+        plain: 'Inbox',
+        bullets: 'Ideas',
+        checklist: 'Lists',
+        shopping: 'Shopping',
+        plan: 'Plans',
+        poetry: 'Poems'
+      };
+      return map[kind] || 'Inbox';
+    }
+
+    const PAPER_TYPE_ORDER = ['plain', 'bullets', 'checklist', 'shopping', 'plan'];
+
+    function shortPaperLabel(kind = 'plain') {
+      const map = {
+        plain: 'Plain',
+        bullets: 'Bullets',
+        checklist: 'Checklist',
+        shopping: 'Shopping',
+        plan: 'Plan'
+      };
+      return map[kind] || 'Plain';
+    }
+
+    function updatePaperTypeButton() {
+      paperTypeBtn.textContent = `Paper: ${shortPaperLabel(currentDocumentType)}`;
+    }
+
+    function initialLinesForDocumentType(kind = currentDocumentType) {
+      if (kind === 'bullets') return ['• '];
+      if (kind === 'checklist') return ['□ '];
+      if (kind === 'shopping') return ['SHOPPING LIST', '□ '];
+      if (kind === 'plan') return ['TODAY', '• ', '', 'NEXT', '• ', '', 'LATER', '• '];
+      return [''];
+    }
+
+    function linePrefixForDocument() {
+      if (currentDocumentType === 'bullets') return '• ';
+      if (currentDocumentType === 'checklist' || currentDocumentType === 'shopping') return '□ ';
+      if (currentDocumentType === 'plan') return '• ';
+      return '';
+    }
+
+    function resetCurrentPageForType() {
+      textState.lines = initialLinesForDocumentType(currentDocumentType).slice(0, textState.maxLines);
+      carriageTargetX = 0;
+      paperTargetY = Math.min(0.54, (textState.lines.length - 1) * 0.034);
+      updateCarriageTarget();
+      updatePaperTexture();
+    }
+
+    function setPaperType(kind, { rewriteBlank = true } = {}) {
+      currentDocumentType = PAPER_TYPE_ORDER.includes(kind) ? kind : 'plain';
+      currentDocumentBook = suggestBookFromType(currentDocumentType);
+      if (rewriteBlank && !noteAsText()) resetCurrentPageForType();
+      updatePaperTypeButton();
+    }
+
+    function cyclePaperType() {
+      const index = PAPER_TYPE_ORDER.indexOf(currentDocumentType);
+      const next = PAPER_TYPE_ORDER[(index + 1) % PAPER_TYPE_ORDER.length];
+      setPaperType(next);
+      pulseBody(0.0018);
+      if (!muted) playKeySound('space');
+    }
+
+    function normalizeBookName(name, fallback = 'Inbox') {
+      const trimmed = String(name || '').trim();
+      return trimmed ? trimmed.slice(0, 32) : fallback;
+    }
+
+    function buildArchiveEntryFromPages(pages, meta = {}) {
+      if (!pages || !pages.length) return null;
+      const first = pages[0];
+      const pageCount = pages.length;
+      return {
+        pages,
+        title: meta.title || first.title || 'Untitled slip',
+        timestamp: meta.timestamp || first.timestamp || formatTimestamp(),
+        stamp: meta.stamp || first.stamp || '',
+        preview: meta.preview || first.preview || '',
+        noteType: meta.noteType || 'plain',
+        book: normalizeBookName(meta.book || 'Inbox'),
+        pageCount,
+        isBundle: pageCount > 1
+      };
+    }
+
+    function buildArchiveEntryFromCurrentNote(note, noteType = currentDocumentType, book = currentDocumentBook) {
+      if (!note) return null;
+      return buildArchiveEntryFromPages([note], {
+        title: note.title,
+        timestamp: note.timestamp,
+        stamp: note.stamp,
+        preview: note.preview,
+        noteType,
+        book
+      });
+    }
+
+    function activeArchiveEntry() {
+      return savedNotes[activeArchiveIndex] || null;
+    }
+
+    function activeArchivePageNote() {
+      const entry = activeArchiveEntry();
+      if (!entry) return null;
+      return entry.pages[Math.max(0, Math.min(activeArchivePage, entry.pages.length - 1))] || null;
+    }
+
+    function updateArchivePreview() {
+      const entry = activeArchiveEntry();
+      if (!entry) return;
+      activeArchivePage = Math.max(0, Math.min(activeArchivePage, entry.pages.length - 1));
+      const page = activeArchivePageNote();
+      modalTitle.textContent = entry.title;
+      const pageLabel = entry.pages.length > 1 ? `${entry.pages.length} pages` : '1 page';
+      archiveInfo.textContent = `${entry.timestamp} · ${entry.book} · ${prettifyNoteType(entry.noteType)} · ${pageLabel}${entry.stamp ? ` · ${entry.stamp}` : ''}`;
+      renderArchiveMoveChips();
+      archivePageLabel.textContent = `Page ${activeArchivePage + 1} / ${entry.pages.length}`;
+      const visible = entry.pages.length > 1;
+      archivePrevBtn.disabled = activeArchivePage <= 0;
+      archiveNextBtn.disabled = activeArchivePage >= entry.pages.length - 1;
+      archivePrevBtn.style.visibility = visible ? 'visible' : 'hidden';
+      archiveNextBtn.style.visibility = visible ? 'visible' : 'hidden';
+      archivePageLabel.style.visibility = visible ? 'visible' : 'hidden';
+      const ctx = archivePreview.getContext('2d');
+      ctx.clearRect(0, 0, archivePreview.width, archivePreview.height);
+      if (page) ctx.drawImage(page.canvas, 0, 0, archivePreview.width, archivePreview.height);
+    }
+
+    function formatInputByMode(inputText, mode) {
+      const lines = inputText.split('\n').map(line => line.trim()).filter(Boolean);
+      if (mode === 'bullets') return lines.map(line => `• ${line}`).join('\n');
+      if (mode === 'checklist') return lines.map(line => `□ ${line}`).join('\n');
+      if (mode === 'shopping') {
+        const items = lines.map(line => `□ ${line}`).join('\n');
+        return items ? `SHOPPING LIST\n${items}` : 'SHOPPING LIST';
+      }
+      if (mode === 'plan') {
+        const today = lines.slice(0, 3).map(line => `• ${line}`).join('\n') || '• ';
+        const next = lines.slice(3, 6).map(line => `• ${line}`).join('\n') || '• ';
+        const later = lines.slice(6).map(line => `• ${line}`).join('\n') || '• ';
+        return `TODAY\n${today}\n\nNEXT\n${next}\n\nLATER\n${later}`;
+      }
+      return inputText;
+    }
+
+    function beginPrintBundle(fullText, noteType, book) {
+      currentPrintBundle = {
+        pages: [],
+        noteType,
+        book: normalizeBookName(book, suggestBookFromType(noteType)),
+        title: titleFromLines(fullText.split('\n')),
+        preview: fullText.replace(/\s+/g, ' ').slice(0, 52) || 'Untitled note',
+        stamp: stampPool[Math.floor(Math.random() * stampPool.length)],
+        timestamp: formatTimestamp()
+      };
+    }
+
+    function finalizePrintBundle() {
+      if (!currentPrintBundle) return;
+      const finalPage = createSavedNote();
+      if (finalPage) currentPrintBundle.pages.push(finalPage);
+      const entry = buildArchiveEntryFromPages(currentPrintBundle.pages, currentPrintBundle);
+      if (entry) addSavedNote(entry);
+      currentPrintBundle = null;
+    }
+
+    const NOTEBOOK_STORAGE_KEY = 'little-3d-typewriter-notes-v1';
+
+    function serializePageForStorage(page) {
+      if (!page?.canvas) return null;
+      return {
+        lines: Array.isArray(page.lines) ? page.lines : [],
+        title: page.title || 'Untitled slip',
+        timestamp: page.timestamp || formatTimestamp(),
+        stamp: page.stamp || '',
+        preview: page.preview || '',
+        image: page.canvas.toDataURL('image/png')
+      };
+    }
+
+    function serializeEntryForStorage(entry) {
+      if (!entry?.pages?.length) return null;
+      const pages = entry.pages.map(serializePageForStorage).filter(Boolean);
+      if (!pages.length) return null;
+      return {
+        pages,
+        title: entry.title || pages[0].title || 'Untitled slip',
+        timestamp: entry.timestamp || pages[0].timestamp || formatTimestamp(),
+        stamp: entry.stamp || pages[0].stamp || '',
+        preview: entry.preview || pages[0].preview || '',
+        noteType: entry.noteType || 'plain',
+        book: normalizeBookName(entry.book || 'Inbox'),
+        pageCount: pages.length,
+        isBundle: pages.length > 1
+      };
+    }
+
+    function hydrateStoredPage(raw) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 720;
+      const ctx = canvas.getContext('2d');
+
+      // Immediate fallback so thumbnails are never totally blank.
+      ctx.fillStyle = '#f8e7c5';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (raw?.image) {
+        const img = new Image();
+        img.onload = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          renderSavedNotes();
+          if (activeArchiveIndex >= 0) updateArchivePreview();
+        };
+        img.src = raw.image;
+      }
+
+      return {
+        lines: Array.isArray(raw?.lines) ? raw.lines : [''],
+        canvas,
+        title: raw?.title || titleFromLines(raw?.lines || ['Untitled slip']),
+        timestamp: raw?.timestamp || formatTimestamp(),
+        stamp: raw?.stamp || '',
+        preview: raw?.preview || ''
+      };
+    }
+
+    function hydrateStoredEntry(raw) {
+      if (!raw?.pages?.length) return null;
+      const pages = raw.pages.map(hydrateStoredPage);
+      return buildArchiveEntryFromPages(pages, {
+        title: raw.title,
+        timestamp: raw.timestamp,
+        stamp: raw.stamp,
+        preview: raw.preview,
+        noteType: raw.noteType || 'plain',
+        book: normalizeBookName(raw.book || 'Inbox')
+      });
+    }
+
+    function saveNotebookStorage() {
+      try {
+        const payload = {
+          version: 1,
+          savedAt: new Date().toISOString(),
+          notes: savedNotes.map(serializeEntryForStorage).filter(Boolean)
+        };
+        localStorage.setItem(NOTEBOOK_STORAGE_KEY, JSON.stringify(payload));
+        return true;
+      } catch (error) {
+        console.warn('[Little 3D Typewriter] Could not save notebook storage:', error);
+        return false;
+      }
+    }
+
+    function loadNotebookStorage() {
+      try {
+        const raw = localStorage.getItem(NOTEBOOK_STORAGE_KEY);
+        if (!raw) return false;
+        const payload = JSON.parse(raw);
+        const notes = Array.isArray(payload?.notes) ? payload.notes : Array.isArray(payload) ? payload : [];
+        const hydrated = notes.map(hydrateStoredEntry).filter(Boolean);
+        savedNotes.splice(0, savedNotes.length, ...hydrated);
+        return hydrated.length > 0;
+      } catch (error) {
+        console.warn('[Little 3D Typewriter] Could not load notebook storage:', error);
+        return false;
+      }
+    }
+
+    const DEFAULT_NOTEBOOKS = ['All', 'Inbox', 'Before Sleep', 'Insights', 'Plans', 'Lists', 'Poems', 'Class'];
+    const BOOK_ICONS = {
+      All: '✦',
+      Inbox: '📥',
+      'Before Sleep': '🌙',
+      Insights: '💡',
+      Plans: '🗓',
+      Lists: '☑',
+      Shopping: '🛒',
+      Poems: '🪶',
+      Class: '🎒',
+      Ideas: '✨'
+    };
+    const BOOK_COLORS = {
+      All: ['rgba(111,86,116,0.76)', 'rgba(54,43,62,0.9)'],
+      Inbox: ['rgba(142,104,72,0.76)', 'rgba(78,55,43,0.92)'],
+      'Before Sleep': ['rgba(65,78,124,0.76)', 'rgba(30,35,66,0.92)'],
+      Insights: ['rgba(156,120,64,0.78)', 'rgba(86,58,37,0.92)'],
+      Plans: ['rgba(86,122,105,0.76)', 'rgba(42,67,58,0.92)'],
+      Lists: ['rgba(110,105,142,0.76)', 'rgba(58,53,85,0.92)'],
+      Shopping: ['rgba(157,126,72,0.76)', 'rgba(86,66,39,0.92)'],
+      Poems: ['rgba(125,83,121,0.76)', 'rgba(63,42,68,0.92)'],
+      Class: ['rgba(84,119,132,0.76)', 'rgba(39,63,73,0.92)'],
+      Ideas: ['rgba(145,95,80,0.76)', 'rgba(76,45,44,0.92)']
+    };
+
+    function notebookCounts() {
+      const counts = new Map();
+      DEFAULT_NOTEBOOKS.forEach(book => counts.set(book, book === 'All' ? savedNotes.length : 0));
+      savedNotes.forEach(entry => {
+        const book = normalizeBookName(entry.book || 'Inbox');
+        counts.set(book, (counts.get(book) || 0) + 1);
+      });
+      counts.set('All', savedNotes.length);
+      return counts;
+    }
+
+    function notebookLabel(book) {
+      return book === 'All' ? 'All Notes' : book;
+    }
+
+    function bookIcon(book) {
+      return BOOK_ICONS[book] || '📓';
+    }
+
+    function bookColors(book) {
+      return BOOK_COLORS[book] || ['rgba(129,93,78,0.76)', 'rgba(69,47,43,0.92)'];
+    }
+
+    function availableNotebookNames({ includeAll = false } = {}) {
+      const counts = notebookCounts();
+      const names = [...counts.keys()].filter(book => includeAll || book !== 'All');
+      return names.sort((a, b) => {
+        const ia = DEFAULT_NOTEBOOKS.indexOf(a);
+        const ib = DEFAULT_NOTEBOOKS.indexOf(b);
+        if (ia !== -1 || ib !== -1) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+        return a.localeCompare(b);
+      });
+    }
+
+    function setDrawerCollapsed(collapsed) {
+      noteDrawer.classList.toggle('collapsed', collapsed);
+      drawerToggleBtn.textContent = collapsed ? 'Open' : 'Fold';
+    }
+
+    function toggleDrawer() {
+      setDrawerCollapsed(!noteDrawer.classList.contains('collapsed'));
+    }
+
+    function flashSelectedBookChip(container, book) {
+      if (!container) return;
+      const chip = [...container.querySelectorAll('.book-chip')]
+        .find(item => item.dataset.bookName === book);
+      if (!chip) return;
+      chip.classList.remove('confirmed');
+      void chip.offsetWidth;
+      chip.classList.add('confirmed');
+    }
+
+    function renderBookChips(container, selectedBook, onPick, options = {}) {
+      if (!container) return;
+      container.innerHTML = '';
+      availableNotebookNames({ includeAll: !!options.includeAll }).forEach(book => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.dataset.bookName = book;
+        chip.className = `book-chip${book === selectedBook ? ' active' : ''}`;
+        chip.textContent = `#${notebookLabel(book)}`;
+        chip.addEventListener('click', () => onPick(book));
+        container.appendChild(chip);
+      });
+    }
+
+    function renderSaveBookChips() {
+      renderBookChips(saveBookChips, normalizeBookName(saveBookInput.value, currentDocumentBook || 'Inbox'), book => {
+        saveBookInput.value = book;
+        currentDocumentBook = book;
+        renderSaveBookChips();
+        flashSelectedBookChip(saveBookChips, book);
+      });
+    }
+
+    function renderTuckBookChips() {
+      renderBookChips(tuckBookChips, pendingTuckBook, book => {
+        pendingTuckBook = book;
+        renderTuckBookChips();
+        flashSelectedBookChip(tuckBookChips, book);
+      });
+    }
+
+    function updateTuckPreview() {
+      if (!pendingTuckEntry?.pages?.length) return;
+      const page = pendingTuckEntry.pages[0];
+      const ctx = tuckPreview.getContext('2d');
+      ctx.clearRect(0, 0, tuckPreview.width, tuckPreview.height);
+      ctx.drawImage(page.canvas, 0, 0, tuckPreview.width, tuckPreview.height);
+    }
+
+    function openTuckPrompt(entry) {
+      pendingTuckEntry = entry;
+      pendingTuckBook = normalizeBookName(entry?.book || currentDocumentBook || 'Inbox');
+      openModal('tuck');
+      renderTuckBookChips();
+      updateTuckPreview();
+    }
+
+    function confirmTuckPrompt() {
+      if (!pendingTuckEntry) return;
+      pendingTuckEntry.book = normalizeBookName(pendingTuckBook, 'Inbox');
+      addSavedNote(pendingTuckEntry);
+      pendingTuckEntry = null;
+      closeModal();
+    }
+
+    function discardTuckPrompt() {
+      pendingTuckEntry = null;
+      closeModal();
+    }
+
+    function moveActiveArchiveToBook(book) {
+      const entry = activeArchiveEntry();
+      if (!entry) return;
+      entry.book = normalizeBookName(book, 'Inbox');
+      saveNotebookStorage();
+      selectedBookFilter = entry.book;
+      notebookView = 'book';
+      renderSavedNotes();
+      updateArchivePreview();
+      flashSelectedBookChip(archiveMoveChips, entry.book);
+      archiveInfo.classList.remove('book-moved');
+      void archiveInfo.offsetWidth;
+      archiveInfo.classList.add('book-moved');
+    }
+
+    function renderArchiveMoveChips() {
+      const entry = activeArchiveEntry();
+      renderBookChips(archiveMoveChips, entry?.book || 'Inbox', moveActiveArchiveToBook);
+    }
+
+    function openNotebook(book) {
+      selectedBookFilter = book;
+      notebookView = 'book';
+      setDrawerCollapsed(false);
+      renderSavedNotes();
+    }
+
+    function showShelf() {
+      notebookView = 'shelf';
+      selectedBookFilter = 'All';
+      setDrawerCollapsed(false);
+      renderSavedNotes();
+    }
+
+    function visibleNotesForCurrentBook() {
+      if (selectedBookFilter === 'All') return [...savedNotes];
+      return savedNotes.filter(entry => normalizeBookName(entry.book || 'Inbox') === selectedBookFilter);
+    }
+
+    function renderBookShelf() {
+      const counts = notebookCounts();
+      if (notebookView === 'book' && !counts.has(selectedBookFilter)) {
+        selectedBookFilter = 'All';
+      }
+
+      bookShelf.innerHTML = '';
+
+      if (notebookView === 'book') {
+        bookShelf.className = 'book-view-nav';
+
+        const back = document.createElement('button');
+        back.type = 'button';
+        back.className = 'book-back';
+        back.textContent = '← Shelf';
+        back.addEventListener('click', showShelf);
+        bookShelf.appendChild(back);
+
+        const title = document.createElement('div');
+        title.className = 'book-title-card';
+        const count = selectedBookFilter === 'All' ? savedNotes.length : counts.get(selectedBookFilter) || 0;
+        title.innerHTML = `
+          <strong>${notebookLabel(selectedBookFilter)}</strong>
+          <small>${count} slip${count === 1 ? '' : 's'} tucked in</small>
+        `;
+        bookShelf.appendChild(title);
+        return;
+      }
+
+      bookShelf.className = 'shelf-grid';
+      [...counts.entries()].forEach(([book, count]) => {
+        // Keep the shelf compact: always show default books, plus any custom book that has notes.
+        if (!DEFAULT_NOTEBOOKS.includes(book) && count <= 0) return;
+
+        const cover = document.createElement('button');
+        cover.type = 'button';
+        cover.className = `book-cover${count ? '' : ' empty-book'}`;
+        const [a, b] = bookColors(book);
+        cover.style.setProperty('--book-a', a);
+        cover.style.setProperty('--book-b', b);
+        cover.innerHTML = `
+          <span class="book-sticker">${bookIcon(book)}</span>
+          <strong>${notebookLabel(book)}</strong>
+          <small>${count} slip${count === 1 ? '' : 's'}</small>
+        `;
+        cover.addEventListener('click', () => openNotebook(book));
+        bookShelf.appendChild(cover);
+      });
+    }
+
+    function addSavedNote(note) {
+      if (!note) return;
+      savedNotes.unshift(note);
+      saveNotebookStorage();
+      notebookView = 'shelf';
+      selectedBookFilter = 'All';
+      renderSavedNotes();
+      setDrawerCollapsed(true);
+    }
+
+    function renderSavedNotes() {
+      const counts = notebookCounts();
+      const currentCount = notebookView === 'book'
+        ? (selectedBookFilter === 'All' ? savedNotes.length : counts.get(selectedBookFilter) || 0)
+        : savedNotes.length;
+
+      drawerCount.textContent = notebookView === 'book'
+        ? `${currentCount} in book`
+        : `${savedNotes.length} note${savedNotes.length === 1 ? '' : 's'}`;
+
+      renderBookShelf();
+      noteList.innerHTML = '';
+
+      if (notebookView === 'shelf') {
+        const empty = document.createElement('div');
+        empty.className = 'drawer-empty';
+        empty.textContent = savedNotes.length
+          ? 'Choose a notebook cover to open its slips.'
+          : 'Save a paper slip, then it will tuck itself into a notebook here.';
+        noteList.appendChild(empty);
+
+        const stored = document.createElement('div');
+        stored.className = 'storage-note';
+        stored.textContent = 'Saved slips stay in this browser with localStorage.';
+        noteList.appendChild(stored);
+        return;
+      }
+
+      const visibleNotes = visibleNotesForCurrentBook();
+
+      if (!visibleNotes.length) {
+        const empty = document.createElement('div');
+        empty.className = 'drawer-empty';
+        empty.textContent = selectedBookFilter === 'All'
+          ? 'No saved slips yet.'
+          : `No slips in ${selectedBookFilter} yet.`;
+        noteList.appendChild(empty);
+        return;
+      }
+
+      visibleNotes.forEach(entry => {
+        const index = savedNotes.indexOf(entry);
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'note-chip in-book';
+        const firstPage = entry.pages[0];
+        const metaLine = `${entry.pageCount} page${entry.pageCount === 1 ? '' : 's'} · ${prettifyNoteType(entry.noteType)}`;
+        item.innerHTML = `
+          <canvas class="note-thumb" width="54" height="54"></canvas>
+          <div class="note-meta">
+            <strong>${entry.title}</strong>
+            <small>${metaLine}</small>
+            <time>${entry.timestamp}</time>
+          </div>
+        `;
+        const thumb = item.querySelector('.note-thumb');
+        const tctx = thumb.getContext('2d');
+        tctx.drawImage(firstPage.canvas, 0, 0, thumb.width, thumb.height);
+        item.addEventListener('click', () => openArchiveNote(index));
+        noteList.appendChild(item);
+      });
+    }
+
+    function createSavedNote({ stamped = true } = {}) {
+      const text = noteAsText().trim();
+      if (!text) return null;
+      const canvas = clonePaperCanvas();
+      const stamp = stampPool[Math.floor(Math.random() * stampPool.length)];
+      if (stamped) drawStamp(canvas, stamp);
+      const timestamp = formatTimestamp();
+      const lines = [...textState.lines];
+      return { lines, canvas, title: titleFromLines(lines), timestamp, stamp, preview: text.replace(/\s+/g, ' ').slice(0, 52) || 'Untitled note' };
+    }
+
+    function openArchiveNote(index) {
+      if (index < 0 || index >= savedNotes.length) return;
+      activeArchiveIndex = index;
+      activeArchivePage = 0;
+      openModal('archive');
+      updateArchivePreview();
+    }
+
+    function deleteArchiveNote() {
+      if (activeArchiveIndex < 0) return;
+      savedNotes.splice(activeArchiveIndex, 1);
+      saveNotebookStorage();
+      activeArchiveIndex = -1;
+      activeArchivePage = 0;
+      closeModal();
+      renderSavedNotes();
+    }
+
+    function putArchiveNoteBack() {
+      const entry = activeArchiveEntry();
+      const page = activeArchivePageNote();
+      if (!entry || !page) return;
+      currentDocumentType = entry.noteType || 'plain';
+      currentDocumentBook = entry.book || 'Inbox';
+      textState.lines = page.lines.map(line => line.slice(0, textState.maxChars)).slice(0, textState.maxLines);
+      if (!textState.lines.length) textState.lines = [''];
+      carriageTargetX = 0;
+      paperTargetY = Math.min(0.54, (textState.lines.length - 1) * 0.034);
+      updateCarriageTarget();
+      updatePaperTexture();
+      closeModal();
+    }
+
+    function saveArchiveNotePng() {
+      const page = activeArchivePageNote();
+      if (!page) return;
+      page.canvas.toBlob(blob => {
+        if (blob) downloadBlob(blob, timestampName('png'));
+      }, 'image/png');
+    }
+
+    function ejectCurrentPage() {
+      const note = createSavedNote();
+      if (note) {
+        if (currentPrintBundle) currentPrintBundle.pages.push(note);
+        const sheet = new THREE.Mesh(
+          new THREE.PlaneGeometry(4.75, 3.35),
+          new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(note.canvas), color: 0xffffff, roughness: 0.95, side: THREE.DoubleSide })
+        );
+        sheet.material.map.colorSpace = THREE.SRGBColorSpace;
+        sheet.castShadow = true;
+        sheet.receiveShadow = true;
+        const startX = carriage.position.x + 0.25;
+        const startY = paperGroup.position.y + 0.08;
+        const startZ = paperGroup.position.z + 0.18;
+        sheet.position.set(startX, startY, startZ);
+        typewriter.add(sheet);
+
+        const pileIndex = Math.min(archivedSheetCount, 10);
+        const target = { x: 6.2 + (pileIndex % 3) * 0.02, y: 0.15 + pileIndex * 0.01, z: 0.16 + (pileIndex % 4) * 0.03 };
+        const rotTo = -0.62 - pileIndex * 0.015;
+        const tuckedEntry = currentPrintBundle ? null : buildArchiveEntryFromCurrentNote(note, currentDocumentType, currentDocumentBook);
+        flyingSheets.push({
+          mesh: sheet,
+          note: null,
+          start: { x: startX, y: startY, z: startZ },
+          end: target,
+          t: 0,
+          rotTo
+        });
+        if (tuckedEntry) {
+          openTuckPrompt(tuckedEntry);
+        }
+        archivedSheetCount += 1;
+      }
+
+      textState.lines = [''];
+      carriageTargetX = 0;
+      paperTargetY = 0;
+      updatePaperTexture();
+      pulseBody(0.0028);
+      playReturnSound();
+    }
+
+    function advancePageIfNeeded() {
+      ejectCurrentPage();
+    }
+
+    function buildPoetryLine() {
+      const bank = [
+        'EVERY CLACK OPENS ONE.',
+        'THE DESK REMEMBERS LIGHT.',
+        'THE LITTLE MACHINE IS LISTENING.',
+        'INK WAITS UNDER ITS TONGUE.',
+        'TODAY THE PAPER LEANS TOWARD MOONLIGHT.',
+        'A SMALL STORM HIDES IN THE KEYS.',
+        'THE RIBBON KEEPS A QUIET SECRET.',
+        'TINY GEARS PRACTICE THEIR BREATH.',
+        'SOMEWHERE A SENTENCE FINDS ITS SHOES.',
+        'THE MARGIN HOLDS STILL FOR US.',
+        'DUST TURNS GOLD UNDER THE CARRIAGE.',
+        'THE METAL HEART TICKS SOFTLY.',
+        'A PAGE LEAVES LIKE A BIRD.',
+        'ANOTHER PAGE RISES BRAVE AND BLANK.',
+        'EVEN SILENCE HAS A TYPEFACE.',
+        'THE ROOM GROWS WARMER WITH LETTERS.',
+        'TONIGHT THE KEYS SPEAK IN CONSTELLATIONS.',
+        'A LITTLE POEM WALKS OUT OF THE ROLLER.',
+        'THE MACHINE PRETENDS IT IS WEATHER.',
+        'SOME INK CHOOSES TO GLOW.',
+        'THE PAPER TRAY DREAMS OF STARS.',
+        'A CURSOR BLINKS LIKE A TINY WINDOW.',
+        'THE NOTEPILE LEARNS OUR HANDWRITING.',
+        'EACH LINE ARRIVES WITH SMALL COURAGE.',
+        'THE RETURN LEVER BOWS TO THE NEXT THOUGHT.',
+        'THE NIGHT SETTLES INTO MONOSPACE.'
+      ];
+      return bank[Math.floor(Math.random() * bank.length)];
+    }
+
+    // ------------------------------------------------------------
+    // 7. Modal + save / paste / export UI
+    // ------------------------------------------------------------
+    function openModal(kind) {
+      modalOverlay.classList.remove('hidden');
+      modalOverlay.setAttribute('aria-hidden', 'false');
+      pastePanel.classList.toggle('hidden', kind !== 'paste');
+      tuckPanel.classList.toggle('hidden', kind !== 'tuck');
+      savePanel.classList.toggle('hidden', kind !== 'save');
+      archivePanel.classList.toggle('hidden', kind !== 'archive');
+      modalTitle.textContent = kind === 'paste' ? 'Paste & print' : kind === 'save' ? 'Save note' : kind === 'tuck' ? 'Choose notebook' : 'Saved slip';
+      if (kind !== 'archive') archiveInfo.textContent = '';
+      if (kind === 'paste') {
+        noteTypeSelect.value = currentDocumentType || 'plain';
+        pasteBookInput.value = normalizeBookName(currentDocumentBook, suggestBookFromType(noteTypeSelect.value));
+        pasteInput.focus();
+      } else if (kind === 'save') {
+        saveBookInput.value = normalizeBookName(currentDocumentBook, suggestBookFromType(currentDocumentType));
+        renderSaveBookChips();
+        updateSavePreview();
+      }
+    }
+
+    function closeModal() {
+      const wasArchiveOpen = !archivePanel.classList.contains('hidden');
+      const wasTuckOpen = !tuckPanel.classList.contains('hidden');
+      modalOverlay.classList.add('hidden');
+      activeArchiveIndex = wasArchiveOpen ? -1 : activeArchiveIndex;
+      if (wasArchiveOpen) activeArchivePage = 0;
+      if (wasTuckOpen) pendingTuckEntry = null;
+      modalOverlay.setAttribute('aria-hidden', 'true');
+    }
+
+    function updateSavePreview() {
+      if (!paperTexture?.image) return;
+      const ctx = savePreview.getContext('2d');
+      ctx.clearRect(0, 0, savePreview.width, savePreview.height);
+      ctx.drawImage(paperTexture.image, 0, 0, savePreview.width, savePreview.height);
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function timestampName(ext) {
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+      return `nova-note-${stamp}.${ext}`;
+    }
+
+    function stashCurrentNote() {
+      const note = createSavedNote();
+      if (!note) return;
+      currentDocumentBook = normalizeBookName(saveBookInput.value, currentDocumentBook || 'Inbox');
+      addSavedNote(buildArchiveEntryFromCurrentNote(note, currentDocumentType, currentDocumentBook));
+      closeModal();
+    }
+
+    function saveNotePng() {
+      const note = createSavedNote({ stamped: true });
+      if (!note) return;
+      note.canvas.toBlob(blob => {
+        if (blob) downloadBlob(blob, timestampName('png'));
+      }, 'image/png');
+    }
+
+    function saveNoteTxt() {
+      const content = noteAsText() || ' ';
+      downloadBlob(new Blob([content], { type: 'text/plain;charset=utf-8' }), timestampName('txt'));
+    }
+
+    async function printFromInput(startNewPage = false) {
+      let pasted = pasteInput.value || '';
+      if (!pasted.trim()) return;
+      pasted = pasted.replace(/\t/g, '    ').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const noteType = noteTypeSelect.value || 'plain';
+      const bookName = normalizeBookName(pasteBookInput.value, suggestBookFromType(noteType));
+      pasted = formatInputByMode(pasted, noteType);
+      beginPrintBundle(pasted, noteType, bookName);
+      closeModal();
+      if (startNewPage) clearPage();
+      else if (noteAsText()) pasted = '\n' + pasted;
+      currentDocumentType = noteType;
+      currentDocumentBook = bookName;
+      await typeTextWithMistakes(pasted.slice(0, 1600), 64);
+      finalizePrintBundle();
+    }
+
+    function clearPage() {
+      resetCurrentPageForType();
+      pulseBody(0.0014);
+    }
+
+    // ------------------------------------------------------------
+    // 8. Audio engine
+    // ------------------------------------------------------------
+    const SOUND_PRESET_ORDER = ['hard', 'warm', 'soft'];
+
+    const SOUND_PRESETS = {
+      hard: {
+        label: 'Hard',
+        output: 1.42,
+        noiseMul: 3.15,
+        bodyMul: 1.55,
+        returnMul: 1.18,
+        edgeMul: 1.45,
+        rebound: true,
+        bell: true
+      },
+      warm: {
+        label: 'Warm',
+        output: 1.34,
+        noiseMul: 2.72,
+        bodyMul: 1.92,
+        returnMul: 1.13,
+        edgeMul: 0.82,
+        rebound: true,
+        bell: true
+      },
+      soft: {
+        label: 'Soft',
+        output: 1.08,
+        noiseMul: 2.12,
+        bodyMul: 1.66,
+        returnMul: 0.92,
+        edgeMul: 0.52,
+        rebound: false,
+        bell: true
+      }
+    };
+
+    function currentSoundPreset() {
+      return SOUND_PRESETS[soundPreset] || SOUND_PRESETS.hard;
+    }
+
+    function updateSoundPresetButton() {
+      soundPresetBtn.textContent = `Sound: ${currentSoundPreset().label}`;
+    }
+
+    function cycleSoundPreset() {
+      unlockSoundFromGesture();
+      const index = SOUND_PRESET_ORDER.indexOf(soundPreset);
+      soundPreset = SOUND_PRESET_ORDER[(index + 1) % SOUND_PRESET_ORDER.length] || 'hard';
+      updateSoundPresetButton();
+      if (!muted) playKeySound('char');
+    }
+
+    function playKeySound(kind = 'char') {
+      if (muted) return;
+      if (!ensureAudioContext()) return;
+      const cfg = currentSoundPreset();
+
+      const now = audioCtx.currentTime;
+      const output = audioCtx.createGain();
+      output.gain.setValueAtTime(cfg.output, now);
+      output.connect(audioCtx.destination);
+
+      function envelope(peak, attack, release, start = now) {
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), start + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + release);
+        gain.connect(output);
+        return gain;
+      }
+
+      function pinkNoiseBuffer(duration) {
+        const bufLen = Math.max(1, Math.floor(audioCtx.sampleRate * duration));
+        const buffer = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        // Paul Kellet refined pink-noise filter: denser and more mechanical than raw white noise.
+        // v61 normalizes the buffer because the raw pink signal was too quiet on phones.
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        let maxAbs = 0.0001;
+        for (let i = 0; i < bufLen; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.99886 * b0 + white * 0.0555179;
+          b1 = 0.99332 * b1 + white * 0.0750759;
+          b2 = 0.96900 * b2 + white * 0.1538520;
+          b3 = 0.86650 * b3 + white * 0.3104856;
+          b4 = 0.55000 * b4 + white * 0.5329522;
+          b5 = -0.7616 * b5 - white * 0.0168980;
+          const pink = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362);
+          b6 = white * 0.115926;
+          data[i] = pink;
+          maxAbs = Math.max(maxAbs, Math.abs(pink));
+        }
+
+        const normalize = 0.82 / maxAbs;
+        for (let i = 0; i < bufLen; i++) {
+          data[i] = Math.max(-1, Math.min(1, data[i] * normalize));
+        }
+        return buffer;
+      }
+
+      function clackNoise({ peak = 0.07, duration = 0.05, frequency = 1450, q = 3.0, lpf = 5200, start = now, shellRate = 24 }) {
+        const buffer = pinkNoiseBuffer(duration);
+        const data = buffer.getChannelData(0);
+        const len = data.length;
+
+        for (let i = 0; i < len; i++) {
+          const t = i / len;
+          const bite = Math.pow(1 - t, 1.42);
+          const shell = 0.74
+            + Math.sin(t * Math.PI * shellRate) * 0.13
+            + Math.sin(t * Math.PI * (shellRate * 1.85)) * 0.055;
+          data[i] *= bite * shell;
+        }
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+
+        const bp = audioCtx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(frequency, start);
+        bp.Q.value = q;
+
+        const lp = audioCtx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = lpf * Math.min(1.18, Math.max(0.72, cfg.edgeMul * 0.72 + cfg.bodyMul * 0.18));
+        lp.Q.value = 0.45;
+
+        const gain = envelope(peak * cfg.noiseMul, 0.0018, duration + 0.016, start);
+        source.connect(bp);
+        bp.connect(lp);
+        lp.connect(gain);
+        source.start(start);
+        source.stop(start + duration + 0.006);
+      }
+
+      function metalEdge({ start = now, peak = 0.024, duration = 0.014, frequency = 3600 }) {
+        // A very short high-passed noise edge: crisp metal without a pitched "biu".
+        const buffer = pinkNoiseBuffer(duration);
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+
+        const hp = audioCtx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = frequency * Math.min(1.12, Math.max(0.68, cfg.edgeMul));
+        hp.Q.value = 0.68;
+
+        const gain = envelope(peak * cfg.edgeMul, 0.0007, duration + 0.01, start);
+        source.connect(hp);
+        hp.connect(gain);
+        source.start(start);
+        source.stop(start + duration + 0.006);
+      }
+
+      function platenThump({ start = now, peak = 0.035, frequency = 92, release = 0.078 }) {
+        // Paper + rubber platen support. This is the physical "tok" under the clack.
+        const gain = envelope(peak * cfg.bodyMul, 0.0045, release, start);
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, start);
+        osc.frequency.exponentialRampToValueAtTime(42, start + release * 0.72);
+        osc.connect(gain);
+        osc.start(start);
+        osc.stop(start + release + 0.014);
+      }
+
+      function chassisRing({ start = now, frequency = 150, endFrequency = 62, peak = 0.038, release = 0.13 }) {
+        // Short body resonance, not a musical tone.
+        const gain = envelope(peak * cfg.bodyMul, 0.006, release, start);
+        const osc = audioCtx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(frequency, start);
+        osc.frequency.exponentialRampToValueAtTime(endFrequency, start + release * 0.72);
+        osc.connect(gain);
+        osc.start(start);
+        osc.stop(start + release + 0.018);
+      }
+
+      function escapementTick({ start = now, peak = 0.012, frequency = 960 }) {
+        // Tiny stepper/escapement tick after the slug hits.
+        clackNoise({
+          peak,
+          duration: 0.016,
+          frequency,
+          q: 2.7,
+          lpf: 4400,
+          start,
+          shellRate: 17
+        });
+      }
+
+      function typebarRebound({ start = now, strength = 1 }) {
+        // Typebar falling back into the basket. Low and short, not another main hit.
+        clackNoise({
+          peak: 0.015 * strength,
+          duration: 0.030,
+          frequency: 390 + Math.random() * 160,
+          q: 1.38,
+          lpf: 2200,
+          start,
+          shellRate: 11
+        });
+        if (Math.random() < 0.45) {
+          escapementTick({
+            start: start + 0.020 + Math.random() * 0.014,
+            peak: 0.006 * strength,
+            frequency: 430 + Math.random() * 160
+          });
+        }
+      }
+
+      if (kind === 'space') {
+        // Wider keybar: slower and heavier; a broader underbody instead of extra brightness.
+        clackNoise({ peak: 0.125, duration: 0.058, frequency: 1120, q: 2.35, lpf: 4300, shellRate: 18 });
+        metalEdge({ peak: 0.040, duration: 0.013, frequency: 2900 });
+        platenThump({ start: now + 0.006, peak: 0.066, frequency: 76, release: 0.125 });
+        chassisRing({ start: now + 0.004, frequency: 132, endFrequency: 54, peak: 0.060, release: 0.17 });
+        escapementTick({ start: now + 0.058, peak: 0.012, frequency: 500 });
+        if (cfg.rebound) typebarRebound({ start: now + 0.104, strength: 0.65 });
+      } else if (kind === 'back') {
+        // Backspace: tighter and drier, more snap than body.
+        clackNoise({ peak: 0.130, duration: 0.036, frequency: 1700, q: 3.35, lpf: 5600, shellRate: 27 });
+        metalEdge({ peak: 0.030, duration: 0.012, frequency: 3900 });
+        platenThump({ start: now + 0.004, peak: 0.030, frequency: 116, release: 0.065 });
+        chassisRing({ start: now + 0.005, frequency: 215, endFrequency: 84, peak: 0.030, release: 0.086 });
+        escapementTick({ start: now + 0.042, peak: 0.021, frequency: 780 });
+        if (cfg.rebound) typebarRebound({ start: now + 0.082, strength: 0.78 });
+      } else {
+        // Character strike: impact → metal edge → platen → chassis → escapement → typebar rebound.
+        const impactFreq = 1420 + Math.random() * 460;
+        clackNoise({ peak: 0.120, duration: 0.042, frequency: impactFreq, q: 2.85, lpf: 5100, shellRate: 23 + Math.random() * 8 });
+        metalEdge({ start: now + 0.002, peak: 0.034, duration: 0.012, frequency: 3300 + Math.random() * 900 });
+        platenThump({ start: now + 0.005, peak: 0.040, frequency: 88 + Math.random() * 18, release: 0.080 });
+        chassisRing({
+          start: now + 0.006,
+          frequency: 148 + Math.random() * 24,
+          endFrequency: 60 + Math.random() * 12,
+          peak: 0.040,
+          release: 0.125
+        });
+        // Small lower shell knock prevents the sound becoming thin.
+        clackNoise({ peak: 0.026, duration: 0.026, frequency: 430 + Math.random() * 110, q: 1.6, lpf: 2300, start: now + 0.020, shellRate: 10 });
+        escapementTick({ start: now + 0.045 + Math.random() * 0.010, peak: 0.011, frequency: 760 + Math.random() * 230 });
+        if (cfg.rebound) typebarRebound({ start: now + 0.092 + Math.random() * 0.012, strength: 0.72 });
+      }
+    }
+
+    function playBellSound(delay = 0.08) {
+      if (muted) return;
+      if (!currentSoundPreset().bell) return;
+      if (!ensureAudioContext()) return;
+
+      const start = audioCtx.currentTime + delay;
+      const master = audioCtx.createGain();
+      master.gain.setValueAtTime(0.48, start);
+      master.connect(audioCtx.destination);
+
+      function bellEnv(destination, peak, attack, release, t = start) {
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(peak, t + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + release);
+        gain.connect(destination);
+        return gain;
+      }
+
+      // Gentler typewriter bell: two quick struck partials, stable pitch, no weird falling siren.
+      const partialA = audioCtx.createOscillator();
+      partialA.type = 'sine';
+      partialA.frequency.setValueAtTime(1568, start); // G6
+      partialA.detune.setValueAtTime(-6, start);
+      partialA.connect(bellEnv(master, 0.115, 0.0015, 0.34, start));
+      partialA.start(start);
+      partialA.stop(start + 0.38);
+
+      const partialB = audioCtx.createOscillator();
+      partialB.type = 'sine';
+      partialB.frequency.setValueAtTime(2093, start + 0.006); // C7
+      partialB.detune.setValueAtTime(4, start + 0.006);
+      partialB.connect(bellEnv(master, 0.052, 0.001, 0.24, start + 0.006));
+      partialB.start(start + 0.006);
+      partialB.stop(start + 0.28);
+
+      // A tiny struck attack keeps it mechanical rather than music-box sweet.
+      const tick = audioCtx.createBufferSource();
+      tick.buffer = (() => {
+        const duration = 0.018;
+        const buffer = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * duration), audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          const t = i / data.length;
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.5);
+        }
+        return buffer;
+      })();
+      const hp = audioCtx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 2600;
+      const tickGain = bellEnv(master, 0.018, 0.0007, 0.025, start);
+      tick.connect(hp);
+      hp.connect(tickGain);
+      tick.start(start);
+      tick.stop(start + 0.02);
+    }
+
+    function maybePlayLineEndBell() {
+      // v61: bell is attached to newline/return, not the line-end warning column.
+    }
+
+    function playReturnSound() {
+      if (muted) return;
+      if (!ensureAudioContext()) return;
+      const cfg = currentSoundPreset();
+
+      const now = audioCtx.currentTime;
+      const master = audioCtx.createGain();
+      master.gain.setValueAtTime(0.84 * cfg.returnMul, now);
+      master.connect(audioCtx.destination);
+
+      function gainEnv(peak, attack, release, start = now) {
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), start + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + release);
+        gain.connect(master);
+        return gain;
+      }
+
+      function returnNoise({ peak = 0.048, duration = 0.26, frequency = 650, q = 1.2, start = now, sweepTo = 330 }) {
+        const length = Math.floor(audioCtx.sampleRate * duration);
+        const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let last = 0;
+        for (let i = 0; i < length; i++) {
+          const t = i / length;
+          const white = Math.random() * 2 - 1;
+          last = 0.96 * last + 0.04 * white;
+          const rail = Math.sin(t * Math.PI)
+            * (0.72 + Math.sin(t * Math.PI * 9) * 0.13 + Math.sin(t * Math.PI * 23) * 0.045);
+          data[i] = last * rail * 3.0;
+        }
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(frequency, start);
+        filter.frequency.exponentialRampToValueAtTime(Math.max(80, sweepTo), start + duration * 0.86);
+        filter.Q.value = q;
+        const gain = gainEnv(peak * cfg.noiseMul, 0.014, duration + 0.04, start);
+        source.connect(filter);
+        filter.connect(gain);
+        source.start(start);
+        source.stop(start + duration);
+      }
+
+      function latchTick(offset, peak = 0.03, freq = 540, dur = 0.026) {
+        const start = now + offset;
+        returnNoise({ peak, duration: dur, frequency: freq, q: 2.8, start, sweepTo: freq * 0.72 });
+      }
+
+      function stopThump(offset, peak = 0.09, freq = 76) {
+        const start = now + offset;
+        const gain = gainEnv(peak * cfg.bodyMul, 0.003, 0.15, start);
+        const osc = audioCtx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, start);
+        osc.frequency.exponentialRampToValueAtTime(36, start + 0.11);
+        osc.connect(gain);
+        osc.start(start);
+        osc.stop(start + 0.17);
+      }
+
+      // Carriage return as a sequence: rail scrape → ratchet teeth → paper advance → final stop.
+      returnNoise({ peak: 0.048, duration: 0.29, frequency: 720, q: 1.25, start: now + 0.005, sweepTo: 300 });
+      latchTick(0.078, 0.020, 760, 0.018);
+      latchTick(0.118, 0.025, 620, 0.022);
+      latchTick(0.158, 0.017, 500, 0.018);
+      returnNoise({ peak: 0.018, duration: 0.15, frequency: 360, q: 0.9, start: now + 0.135, sweepTo: 210 });
+      stopThump(0.255, 0.092, 78);
+      returnNoise({ peak: 0.018, duration: 0.055, frequency: 420, q: 1.35, start: now + 0.327, sweepTo: 270 });
+    }
+
+    function setResponsiveCamera() {
+      const isMobile = window.innerWidth < 720;
+      camera.position.set(1.25, isMobile ? 6.1 : 5.55, isMobile ? 12.2 : 10.9);
+      camera.lookAt(0, 1.18, 0.58);
+      viewMode = 'display';
+      viewBtn.textContent = 'View: Display';
+    }
+
+    function setTypewriterScale(nextScale) {
+      typewriterScale = THREE.MathUtils.clamp(nextScale, 0.78, 1.26);
+      typewriter.scale.setScalar(typewriterScale);
+      resetSizeBtn.textContent = `${Math.round(typewriterScale * 100)}%`;
+    }
+
+    function resetView() {
+      dragYaw = 0;
+      dragPitch = 0;
+      viewMode = 'display';
+      setTypewriterScale(1);
+      setResponsiveCamera();
+    }
+
+    function setupLights() {
+      const hemi = new THREE.HemisphereLight(0xffe5c1, 0x17212d, 2.7);
+      scene.add(hemi);
+
+      const key = new THREE.DirectionalLight(0xffe0b8, 3.2);
+      key.position.set(-4, 7, 6);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.camera.near = 0.1;
+      key.shadow.camera.far = 20;
+      key.shadow.camera.left = -8;
+      key.shadow.camera.right = 8;
+      key.shadow.camera.top = 8;
+      key.shadow.camera.bottom = -8;
+      scene.add(key);
+
+      const rim = new THREE.PointLight(0x7fa6ff, 1.45, 16);
+      rim.position.set(4, 4.8, -5.5);
+      scene.add(rim);
+    }
+
+    function setupEvents() {
+      window.addEventListener('keydown', event => {
+        unlockSoundFromGesture();
+        handlePhysicalKey(event);
+      });
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        setResponsiveCamera();
+      });
+
+      document.addEventListener('pointerdown', event => {
+        if (event.target.closest('button, input, textarea, select, canvas')) {
+          unlockSoundFromGesture();
+        }
+      }, { capture: true });
+
+      renderer.domElement.addEventListener('wheel', event => {
+        event.preventDefault();
+        const delta = event.deltaY > 0 ? -0.04 : 0.04;
+        setTypewriterScale(typewriterScale + delta);
+      }, { passive: false });
+
+      renderer.domElement.addEventListener('pointerdown', event => {
+        unlockSoundFromGesture();
+        pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+        pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const hit = raycaster.intersectObjects(clickable, true)[0];
+        if (hit?.object?.userData?.keyLabel) {
+          handleVirtualKey(hit.object.userData.keyLabel);
+          return;
+        }
+        startDrag(event);
+      });
+
+      soundPresetBtn.addEventListener('click', cycleSoundPreset);
+            drawerToggleBtn.addEventListener('click', toggleDrawer);
+      tuckConfirmBtn.addEventListener('click', confirmTuckPrompt);
+      tuckDiscardBtn.addEventListener('click', discardTuckPrompt);
+      saveBookInput.addEventListener('input', renderSaveBookChips);
+      paperTypeBtn.addEventListener('click', cyclePaperType);
+      muteBtn.addEventListener('click', () => {
+        muted = !muted;
+        muteBtn.textContent = muted ? 'Sound off' : 'Sound on';
+        if (!muted) unlockSoundFromGesture({ preview: true });
+      });
+
+      clearBtn.addEventListener('click', clearPage);
+      pasteBtn.addEventListener('click', () => openModal('paste'));
+      saveBtn.addEventListener('click', () => openModal('save'));
+      modalCloseBtn.addEventListener('click', closeModal);
+      modalOverlay.addEventListener('pointerdown', event => {
+        if (event.target === modalOverlay) closeModal();
+      });
+      noteTypeSelect.addEventListener('change', () => {
+        setPaperType(noteTypeSelect.value, { rewriteBlank: false });
+        pasteBookInput.value = suggestBookFromType(noteTypeSelect.value);
+      });
+      pasteAppendBtn.addEventListener('click', () => printFromInput(false));
+      pasteNewBtn.addEventListener('click', () => printFromInput(true));
+      stashBtn.addEventListener('click', stashCurrentNote);
+      downloadPngBtn.addEventListener('click', saveNotePng);
+      downloadTxtBtn.addEventListener('click', saveNoteTxt);
+      archivePutBackBtn.addEventListener('click', putArchiveNoteBack);
+      archiveDeleteBtn.addEventListener('click', deleteArchiveNote);
+      archiveSavePngBtn.addEventListener('click', saveArchiveNotePng);
+      archivePrevBtn.addEventListener('click', () => {
+        activeArchivePage = Math.max(0, activeArchivePage - 1);
+        updateArchivePreview();
+      });
+      archiveNextBtn.addEventListener('click', () => {
+        const entry = activeArchiveEntry();
+        if (!entry) return;
+        activeArchivePage = Math.min(entry.pages.length - 1, activeArchivePage + 1);
+        updateArchivePreview();
+      });
+
+      smallerBtn.addEventListener('click', () => setTypewriterScale(typewriterScale - 0.06));
+      biggerBtn.addEventListener('click', () => setTypewriterScale(typewriterScale + 0.06));
+      resetSizeBtn.addEventListener('click', () => setTypewriterScale(1));
+      resetViewBtn.addEventListener('click', resetView);
+
+      viewBtn.addEventListener('click', () => {
+        viewMode = 'display';
+        setResponsiveCamera();
+      });
+
+      poetryBtn.addEventListener('click', () => {
+        ensureAudioContext();
+        currentDocumentType = 'poetry';
+        currentDocumentBook = 'Poems';
+        updatePaperTypeButton();
+        const line = buildPoetryLine();
+        const current = textState.lines[textState.lines.length - 1] || '';
+        const prefix = current.trim() ? String.fromCharCode(10) : '';
+        typeTextWithMistakes(prefix + line, 70);
+      });
+    }
+
+    let dragActive = false;
+    let dragStart = { x: 0, y: 0, yaw: 0, pitch: 0 };
+
+    function startDrag(event) {
+      dragActive = true;
+      dragStart = { x: event.clientX, y: event.clientY, yaw: dragYaw, pitch: dragPitch };
+      renderer.domElement.setPointerCapture?.(event.pointerId);
+      renderer.domElement.addEventListener('pointermove', onDragMove);
+      renderer.domElement.addEventListener('pointerup', endDrag, { once: true });
+      renderer.domElement.addEventListener('pointercancel', endDrag, { once: true });
+    }
+
+    function onDragMove(event) {
+      if (!dragActive) return;
+      dragYaw = THREE.MathUtils.clamp(dragStart.yaw + (event.clientX - dragStart.x) * 0.006, -0.52, 0.52);
+      dragPitch = THREE.MathUtils.clamp(dragStart.pitch + (event.clientY - dragStart.y) * 0.004, -0.12, 0.18);
+    }
+
+    function endDrag() {
+      dragActive = false;
+      renderer.domElement.removeEventListener('pointermove', onDragMove);
+    }
+
+    function animate() {
+      const delta = Math.min(clock.getDelta(), 0.033);
+      const elapsed = clock.elapsedTime;
+
+      textState.cursorTimer += delta;
+      if (textState.cursorTimer > 0.52) {
+        textState.cursorTimer = 0;
+        textState.cursorVisible = !textState.cursorVisible;
+        updatePaperTexture();
+      }
+
+      typewriter.rotation.y = THREE.MathUtils.lerp(typewriter.rotation.y, dragYaw, 0.08);
+      typewriter.rotation.x = THREE.MathUtils.lerp(typewriter.rotation.x, dragPitch + Math.sin(elapsed * 0.55) * 0.0022, 0.08);
+      typewriter.rotation.z = Math.sin(elapsed * 20) * bodyWobble;
+      bodyWobble *= Math.pow(0.00001, delta);
+      carriageJiggle *= Math.pow(0.00002, delta);
+
+      carriage.position.x = THREE.MathUtils.lerp(carriage.position.x, carriageTargetX, 0.14);
+      carriage.position.y = Math.sin(elapsed * 18) * carriageJiggle * 0.18;
+      paperGroup.position.y = THREE.MathUtils.lerp(paperGroup.position.y, 2.95 + paperTargetY, 0.12);
+      paperGroup.rotation.z = Math.sin(elapsed * 1.6) * 0.0011;
+
+      keyMeshes.forEach(key => {
+        key.userData.press = Math.max(0, key.userData.press - delta * 4.25);
+        const p = easeOutBack(key.userData.press);
+        key.position.y = key.userData.baseY - p * (key.userData.baseY > 1.18 ? 0.068 : 0.078);
+        key.rotation.x = -p * 0.03;
+      });
+
+      typebars.forEach(bar => {
+        bar.userData.hit = Math.max(0, bar.userData.hit - delta * 6.8);
+        const h = easeOutCubic(bar.userData.hit);
+        bar.rotation.x = bar.userData.baseX - h * 0.72;
+        bar.rotation.z = Math.sin(h * Math.PI) * 0.05;
+      });
+
+      const impact = typewriter.getObjectByName('impactDot');
+      if (impact) {
+        impact.scale.multiplyScalar(Math.pow(0.02, delta));
+        if (impact.scale.x < 0.01) impact.scale.setScalar(0.001);
+      }
+
+      for (let i = flyingSheets.length - 1; i >= 0; i--) {
+        const sheet = flyingSheets[i];
+        sheet.t = Math.min(1, sheet.t + delta * 1.45);
+        const t = easeOutCubic(sheet.t);
+        const lift = Math.sin(Math.min(1, t) * Math.PI) * 1.15;
+        const sideDrift = Math.sin(Math.min(1, t) * Math.PI) * 0.22;
+        sheet.mesh.position.set(
+          THREE.MathUtils.lerp(sheet.start.x, sheet.end.x, t) + sideDrift,
+          THREE.MathUtils.lerp(sheet.start.y, sheet.end.y, t) + lift,
+          THREE.MathUtils.lerp(sheet.start.z, sheet.end.z, t)
+        );
+        sheet.mesh.rotation.z = THREE.MathUtils.lerp(0, sheet.rotTo, t);
+        sheet.mesh.rotation.x = THREE.MathUtils.lerp(0, -1.22, t);
+        sheet.mesh.rotation.y = THREE.MathUtils.lerp(0, 0.26, t);
+        if (sheet.t >= 1) {
+          if (sheet.note) addSavedNote(sheet.note);
+          if (sheet.mesh.parent) sheet.mesh.parent.remove(sheet.mesh);
+          sheet.mesh.geometry.dispose();
+          if (sheet.mesh.material.map) sheet.mesh.material.map.dispose();
+          sheet.mesh.material.dispose();
+          flyingSheets.splice(i, 1);
+        }
+      }
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    function easeOutBack(t) {
+      const c1 = 1.70158;
+      const c3 = c1 + 1;
+      return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    }
+
+    function hideLoadingOverlaySoon() {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          loadingOverlay?.classList.add('hidden');
+        });
+      });
+    }
+
+    runStartupChecks();
+    setupLights();
+    buildTypewriter();
+    setTypewriterScale(1);
+    createMobileKeyboard();
+    updateSoundPresetButton();
+    updatePaperTypeButton();
+    loadNotebookStorage();
+    renderSavedNotes();
+    setDrawerCollapsed(true);
+    setupEvents();
+    setResponsiveCamera();
+    animate();
+    hideLoadingOverlaySoon();
+  </script>
+</body>
+</html>
